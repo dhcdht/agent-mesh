@@ -27,7 +27,13 @@ pnpm --filter @agent-mesh/cli start --help
 pnpm --filter @agent-mesh/cli start -- mesh:create --id mesh-1 --name "Mesh One"
 ```
 
-### 2) 添加 Repo
+### 2) 列出 Mesh
+
+```bash
+pnpm --filter @agent-mesh/cli start -- mesh:list
+```
+
+### 3) 添加 Repo
 
 ```bash
 pnpm --filter @agent-mesh/cli start -- repo:add \
@@ -37,7 +43,7 @@ pnpm --filter @agent-mesh/cli start -- repo:add \
   --agent-id agent-frontend
 ```
 
-### 3) 创建任务
+### 4) 创建任务
 
 ```bash
 pnpm --filter @agent-mesh/cli start -- task:create \
@@ -49,13 +55,13 @@ pnpm --filter @agent-mesh/cli start -- task:create \
   --repo-id repo-frontend
 ```
 
-### 4) 查询任务
+### 5) 查询任务
 
 ```bash
 pnpm --filter @agent-mesh/cli start -- task:list --mesh-id mesh-1 --owner agent-frontend
 ```
 
-### 5) 查询收件箱
+### 6) 查询收件箱
 
 ```bash
 pnpm --filter @agent-mesh/cli start -- inbox:list --mesh-id mesh-1 --agent-id lead

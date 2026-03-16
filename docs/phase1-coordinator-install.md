@@ -55,6 +55,7 @@ pnpm --filter @agent-mesh/coordinator test
 ## 6. API 入口
 
 - 健康检查：`GET /health`
+- 指标：`GET /metrics`（meshes/tasks/agents/messages 数量）
 - Swagger UI：`GET /docs`
 - Web 控制台（人工辅助模式）：`GET /dashboard`
 - 业务接口前缀：`/api/v1`
@@ -62,6 +63,7 @@ pnpm --filter @agent-mesh/coordinator test
 ## 7. MVP 已实现接口
 
 - Mesh
+  - `GET /api/v1/meshes` — 列表
   - `POST /api/v1/meshes`
   - `GET /api/v1/meshes/:meshId`
   - `PATCH /api/v1/meshes/:meshId`

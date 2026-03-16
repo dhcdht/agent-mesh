@@ -27,9 +27,13 @@
 <body>
   <h1>Agent Mesh 控制台</h1>
   <div class="section">
-    <h2>Mesh ID</h2>
-    <input type="text" id="meshInput" placeholder="mesh-example" style="padding:0.5rem;width:200px;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#eee;">
+    <h2>Mesh</h2>
+    <select id="meshSelect" style="padding:0.5rem;min-width:200px;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#eee;">
+      <option value="">加载中...</option>
+    </select>
+    <input type="text" id="meshInput" placeholder="或输入 mesh ID" style="padding:0.5rem;width:150px;margin-left:0.5rem;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#eee;">
     <button id="refreshBtn">刷新</button>
+    <label style="margin-left:1rem;"><input type="checkbox" id="autoRefresh" checked> 自动刷新 (10s)</label>
   </div>
   <div class="section" id="tasksSection">
     <h2>任务</h2>
@@ -48,11 +52,19 @@
 
   <script>
     const API = '/api/v1';
+    const meshSelect = document.getElementById('meshSelect');
     const meshInput = document.getElementById('meshInput');
     const tasksBody = document.getElementById('tasksBody');
     const inboxBody = document.getElementById('inboxBody');
     const refreshBtn = document.getElementById('refreshBtn');
+    const autoRefreshEl = document.getElementById('autoRefresh');
     const errEl = document.getElementById('error');
+
+    function getMeshId() {
+      const fromInput = meshInput.value.trim();
+      if (fromInput) return fromInput;
+      return meshSelect.value || '';
+    }
 
     async function fetchJson(path) {
       const r = await fetch(API + path);
@@ -60,8 +72,20 @@
       return r.json();
     }
 
+    async function loadMeshes() {
+      try {
+        const { items } = await fetchJson('/meshes');
+        meshSelect.innerHTML = '<option value="">选择 mesh...</option>' +
+          items.map(m => `<option value="${m.id}">${m.id} (${m.status})</option>`).join('');
+        const saved = localStorage.getItem('meshId');
+        if (saved) meshSelect.value = saved;
+      } catch (e) {
+        meshSelect.innerHTML = '<option value="">加载失败</option>';
+      }
+    }
+
     async function loadTasks() {
-      const meshId = meshInput.value.trim();
+      const meshId = getMeshId();
       if (!meshId) { tasksBody.innerHTML = '<tr><td colspan="5">请选择 mesh</td></tr>'; return; }
       try {
         const { items } = await fetchJson(`/tasks?meshId=${encodeURIComponent(meshId)}`);
@@ -100,7 +124,7 @@
     }
 
     async function loadInbox() {
-      const meshId = meshInput.value.trim();
+      const meshId = getMeshId();
       if (!meshId) { inboxBody.innerHTML = '<p>请选择 mesh</p>'; return; }
       try {
         const { items } = await fetchJson(`/messages/lead/inbox?meshId=${encodeURIComponent(meshId)}&unreadOnly=false`);
@@ -118,15 +142,24 @@
     }
 
     function refresh() {
-      localStorage.setItem('meshId', meshInput.value);
+      const id = getMeshId();
+      if (id) localStorage.setItem('meshId', id);
       loadTasks();
       loadInbox();
       errEl.textContent = '';
     }
 
-    meshInput.value = localStorage.getItem('meshId') || 'mesh-example';
+    meshSelect.onchange = () => { meshInput.value = ''; refresh(); };
+    meshInput.onchange = () => { meshSelect.value = ''; refresh(); };
     refreshBtn.onclick = refresh;
-    refresh();
+
+    loadMeshes().then(() => {
+      const saved = localStorage.getItem('meshId');
+      if (saved) { meshSelect.value = saved; refresh(); }
+      else refresh();
+    });
+
+    setInterval(() => { if (autoRefreshEl.checked && getMeshId()) refresh(); }, 10000);
   </script>
 </body>
 </html>

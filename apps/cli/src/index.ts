@@ -31,6 +31,16 @@ program
   });
 
 program
+  .command("mesh:list")
+  .description("List all meshes")
+  .action(async () => {
+    const global = program.opts<{ coordinator: string; apiKey?: string }>();
+    const client = withClient(global);
+    const result = await client.request("GET", "/api/v1/meshes");
+    console.log(JSON.stringify(result, null, 2));
+  });
+
+program
   .command("repo:add")
   .requiredOption("--id <id>", "Repo id")
   .requiredOption("--mesh-id <meshId>", "Mesh id")
