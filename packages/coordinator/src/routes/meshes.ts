@@ -9,6 +9,10 @@ const lifecycleTransitions: Record<string, string[]> = {
 };
 
 export async function registerMeshRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/meshes", async (_request, reply) => {
+    return reply.send({ items: app.storage.listMeshes() });
+  });
+
   app.post("/meshes", async (request, reply) => {
     const parsed = createMeshSchema.safeParse(request.body);
     if (!parsed.success) {

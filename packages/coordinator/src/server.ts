@@ -39,6 +39,10 @@ export async function buildServer(dbPath: string): Promise<FastifyInstance> {
 
   app.get("/health", async () => ({ ok: true }));
 
+  app.get("/metrics", async (_request, reply) => {
+    return reply.send(app.storage.getMetrics());
+  });
+
   app.get("/dashboard", async (_request, reply) => {
     const html = readFileSync(join(__dirname, "public", "dashboard.html"), "utf-8");
     return reply.type("text/html").send(html);

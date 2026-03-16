@@ -85,6 +85,7 @@ export function createStorage(dbPath: string): CoordinatorStorage {
     "INSERT INTO meshes (id, name, status, created_at, completed_at) VALUES (?, ?, ?, ?, ?)"
   );
   const getMeshStmt = db.prepare("SELECT * FROM meshes WHERE id = ?");
+  const listMeshesStmt = db.prepare("SELECT * FROM meshes ORDER BY created_at DESC");
   const updateMeshStmt = db.prepare(
     "UPDATE meshes SET name = ?, status = ?, completed_at = ? WHERE id = ?"
   );
@@ -131,6 +132,10 @@ export function createStorage(dbPath: string): CoordinatorStorage {
   );
   const markMessageReadStmt = db.prepare("UPDATE messages SET is_read = 1 WHERE id = ?");
   const getMessageStmt = db.prepare("SELECT * FROM messages WHERE id = ?");
+  const countMeshesStmt = db.prepare("SELECT COUNT(*) as c FROM meshes");
+  const countTasksByStatusStmt = db.prepare("SELECT status, COUNT(*) as c FROM tasks GROUP BY status");
+  const countAgentsStmt = db.prepare("SELECT COUNT(*) as c FROM agents");
+  const countMessagesStmt = db.prepare("SELECT COUNT(*) as c FROM messages");
 
   function mapMesh(row: any): Mesh {
     return {
@@ -209,6 +214,10 @@ export function createStorage(dbPath: string): CoordinatorStorage {
     getMesh(id: string): Mesh | undefined {
       const row = getMeshStmt.get(id);
       return row ? mapMesh(row) : undefined;
+    },
+
+    listMeshes(): Mesh[] {
+      return listMeshesStmt.all().map((row: any) => mapMesh(row));
     },
 
     updateMesh(id: string, patch: UpdateMeshInput): Mesh | undefined {
@@ -385,6 +394,18 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       markMessageReadStmt.run(messageId);
       const row = getMessageStmt.get(messageId);
       return row ? mapMessage(row) : undefined;
+    },
+
+    getMetrics(): { meshes: number; tasks: Record<string, number>; agents: number; messages: number } {
+      const meshes = (countMeshesStmt.get() as { c: number }).c;
+      const agents = (countAgentsStmt.get() as { c: number }).c;
+      const messages = (countMessagesStmt.get() as { c: number }).c;
+      const taskRows = countTasksByStatusStmt.all() as { status: string; c: number }[];
+      const tasks: Record<string, number> = {};
+      for (const row of taskRows) {
+        tasks[row.status] = row.c;
+      }
+      return { meshes, tasks, agents, messages };
     },
   };
 

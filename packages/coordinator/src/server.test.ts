@@ -115,6 +115,29 @@ describe("coordinator api", () => {
     await app.close();
   });
 
+  it("lists meshes and returns metrics", async () => {
+    const app = await createApp();
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/meshes",
+      payload: { id: "mesh-list", name: "list test" },
+    });
+
+    const list = await app.inject({ method: "GET", url: "/api/v1/meshes" });
+    expect(list.statusCode).toBe(200);
+    const listData = list.json() as { items: Array<{ id: string }> };
+    expect(listData.items.some((m) => m.id === "mesh-list")).toBe(true);
+
+    const metricsReq = await app.inject({ method: "GET", url: "/metrics" });
+    expect(metricsReq.statusCode).toBe(200);
+    const m = metricsReq.json() as { meshes: number; tasks: Record<string, number> };
+    expect(m.meshes).toBeGreaterThanOrEqual(1);
+    expect(typeof m.tasks).toBe("object");
+
+    await app.close();
+  });
+
   it("supports mesh lifecycle transition and recycle", async () => {
     const app = await createApp();
 

@@ -63,6 +63,7 @@ export interface CreateMessageInput {
 export interface CoordinatorStorage {
   createMesh(input: CreateMeshInput): Mesh;
   getMesh(id: string): Mesh | undefined;
+  listMeshes(): Mesh[];
   updateMesh(id: string, patch: UpdateMeshInput): Mesh | undefined;
 
   createRepo(input: CreateRepoInput): Repo;
@@ -80,4 +81,6 @@ export interface CoordinatorStorage {
   createMessage(input: CreateMessageInput): Message;
   listInbox(params: { meshId: string; agentId: string; unreadOnly: boolean }): Message[];
   markMessageRead(messageId: string): Message | undefined;
+
+  getMetrics(): { meshes: number; tasks: Record<string, number>; agents: number; messages: number };
 }
