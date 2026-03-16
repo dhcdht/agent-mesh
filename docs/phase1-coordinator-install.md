@@ -56,6 +56,7 @@ pnpm --filter @agent-mesh/coordinator test
 
 - 健康检查：`GET /health`
 - Swagger UI：`GET /docs`
+- Web 控制台（人工辅助模式）：`GET /dashboard`
 - 业务接口前缀：`/api/v1`
 
 ## 7. MVP 已实现接口

@@ -26,8 +26,8 @@ repos:
       name: 后端 Agent
       cliType: claude-code
       cliConfig:
-        # Claude Code 使用环境变量，此处可覆盖
         teamName: my-mesh
+        # baseDir 可选，默认 ~/.claude
 
 # Coordinator 连接（Node 用）
 coordinator:
