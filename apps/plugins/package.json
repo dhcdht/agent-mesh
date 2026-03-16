@@ -1,0 +1,6 @@
+{
+  "name": "@agent-mesh/plugins",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chat platform plugins for Agent Mesh (Phase 5)"
+}
