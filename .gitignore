@@ -1,1 +1,7 @@
 .DS_Store
+node_modules/
+dist/
+.tmp/
+*.db
+.env
+.env.local
