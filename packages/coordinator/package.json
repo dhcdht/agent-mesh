@@ -8,7 +8,7 @@
     "prebuild": "pnpm --filter @agent-mesh/shared build",
     "predev": "pnpm --filter @agent-mesh/shared build",
     "pretest": "pnpm --filter @agent-mesh/shared build",
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').cpSync('src/public','dist/public',{recursive:true})\"",
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "test": "vitest run"

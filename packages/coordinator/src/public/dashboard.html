@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Mesh 控制台</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #1a1a2e; color: #eee; }
+    h1 { margin: 0 0 1rem; font-size: 1.5rem; }
+    .section { margin-bottom: 1.5rem; }
+    .section h2 { font-size: 1rem; color: #888; margin: 0 0 0.5rem; }
+    select, button { padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #444; background: #2a2a3e; color: #eee; }
+    button { cursor: pointer; }
+    button:hover { background: #3a3a4e; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #333; }
+    th { color: #888; font-weight: 500; }
+    .status-pending { color: #f59e0b; }
+    .status-in_progress { color: #3b82f6; }
+    .status-completed { color: #22c55e; }
+    .msg { font-size: 0.875rem; padding: 0.5rem; background: #252538; border-radius: 4px; margin-bottom: 0.25rem; }
+    .msg .meta { color: #888; font-size: 0.75rem; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>Agent Mesh 控制台</h1>
+  <div class="section">
+    <h2>Mesh ID</h2>
+    <input type="text" id="meshInput" placeholder="mesh-example" style="padding:0.5rem;width:200px;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#eee;">
+    <button id="refreshBtn">刷新</button>
+  </div>
+  <div class="section" id="tasksSection">
+    <h2>任务</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Subject</th><th>Owner</th><th>Status</th><th>操作</th></tr>
+      </thead>
+      <tbody id="tasksBody"></tbody>
+    </table>
+  </div>
+  <div class="section" id="inboxSection">
+    <h2>收件箱 (lead)</h2>
+    <div id="inboxBody"></div>
+  </div>
+  <div id="error" class="error"></div>
+
+  <script>
+    const API = '/api/v1';
+    const meshInput = document.getElementById('meshInput');
+    const tasksBody = document.getElementById('tasksBody');
+    const inboxBody = document.getElementById('inboxBody');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const errEl = document.getElementById('error');
+
+    async function fetchJson(path) {
+      const r = await fetch(API + path);
+      if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+      return r.json();
+    }
+
+    async function loadTasks() {
+      const meshId = meshInput.value.trim();
+      if (!meshId) { tasksBody.innerHTML = '<tr><td colspan="5">请选择 mesh</td></tr>'; return; }
+      try {
+        const { items } = await fetchJson(`/tasks?meshId=${encodeURIComponent(meshId)}`);
+        tasksBody.innerHTML = items.length === 0
+          ? '<tr><td colspan="5">无任务</td></tr>'
+          : items.map(t => `
+            <tr>
+              <td>${t.id}</td>
+              <td>${t.subject}</td>
+              <td>${t.owner}</td>
+              <td class="status-${t.status}">${t.status}</td>
+              <td>
+                ${t.status !== 'completed' ? `<button data-id="${t.id}" data-action="complete">标记完成</button>` : ''}
+              </td>
+            </tr>
+          `).join('');
+        tasksBody.querySelectorAll('[data-action="complete"]').forEach(btn => {
+          btn.onclick = () => markComplete(btn.dataset.id);
+        });
+      } catch (e) {
+        tasksBody.innerHTML = '<tr><td colspan="5" class="error">加载失败: ' + e.message + '</td></tr>';
+      }
+    }
+
+    async function markComplete(taskId) {
+      try {
+        await fetch(API + '/tasks/' + taskId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'completed' }),
+        });
+        loadTasks();
+      } catch (e) {
+        errEl.textContent = '标记失败: ' + e.message;
+      }
+    }
+
+    async function loadInbox() {
+      const meshId = meshInput.value.trim();
+      if (!meshId) { inboxBody.innerHTML = '<p>请选择 mesh</p>'; return; }
+      try {
+        const { items } = await fetchJson(`/messages/lead/inbox?meshId=${encodeURIComponent(meshId)}&unreadOnly=false`);
+        inboxBody.innerHTML = items.length === 0
+          ? '<p>无消息</p>'
+          : items.map(m => `
+            <div class="msg">
+              <div class="meta">${m.from} → ${m.to} (${m.timestamp})</div>
+              <pre>${JSON.stringify(m.payload, null, 2)}</pre>
+            </div>
+          `).join('');
+      } catch (e) {
+        inboxBody.innerHTML = '<p class="error">加载失败: ' + e.message + '</p>';
+      }
+    }
+
+    function refresh() {
+      localStorage.setItem('meshId', meshInput.value);
+      loadTasks();
+      loadInbox();
+      errEl.textContent = '';
+    }
+
+    meshInput.value = localStorage.getItem('meshId') || 'mesh-example';
+    refreshBtn.onclick = refresh;
+    refresh();
+  </script>
+</body>
+</html>

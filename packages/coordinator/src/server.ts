@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
@@ -8,6 +11,8 @@ import { registerMeshRoutes } from "./routes/meshes.js";
 import { registerMessageRoutes } from "./routes/messages.js";
 import { registerRepoRoutes } from "./routes/repos.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -33,6 +38,11 @@ export async function buildServer(dbPath: string): Promise<FastifyInstance> {
   });
 
   app.get("/health", async () => ({ ok: true }));
+
+  app.get("/dashboard", async (_request, reply) => {
+    const html = readFileSync(join(__dirname, "public", "dashboard.html"), "utf-8");
+    return reply.type("text/html").send(html);
+  });
 
   await app.register(
     async (api) => {
