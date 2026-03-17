@@ -41,6 +41,14 @@ pnpm --filter @agent-mesh/coordinator dev
 PORT=3100 COORDINATOR_DB_PATH=./data/coordinator.db pnpm --filter @agent-mesh/coordinator dev
 ```
 
+启用 API Key 认证（可选）：
+
+```bash
+MESH_API_KEY=your-secret-key pnpm --filter @agent-mesh/coordinator dev
+```
+
+启用后，所有 `/api/v1/*` 请求需携带 `Authorization: Bearer your-secret-key`。
+
 ## 5. 运行测试
 
 ```bash
@@ -76,7 +84,8 @@ pnpm --filter @agent-mesh/coordinator test
   - `GET /api/v1/agents?meshId=<id>&nodeId=<optional>`（返回 `nodeOnline`）
 - Node
   - `POST /api/v1/nodes/:nodeId/heartbeat`（body: `{ meshId }`）
-  - `GET /api/v1/nodes?meshId=<optional>` — 列出节点及状态（扩缩容）
+  - `GET /api/v1/nodes?meshId=<optional>` — 列出节点及状态
+  - `DELETE /api/v1/nodes/:nodeId` — 下线节点（从注册表移除）
 - Task
   - `POST /api/v1/tasks`
   - `PATCH /api/v1/tasks/:taskId`

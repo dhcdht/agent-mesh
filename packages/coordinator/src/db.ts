@@ -167,6 +167,7 @@ const createTaskStmt = db.prepare(
   const getNodeStatusStmt = db.prepare("SELECT status FROM nodes WHERE id = ?");
   const listNodesStmt = db.prepare("SELECT id, mesh_id, last_heartbeat_at, status FROM nodes ORDER BY last_heartbeat_at DESC");
   const listNodesByMeshStmt = db.prepare("SELECT id, mesh_id, last_heartbeat_at, status FROM nodes WHERE mesh_id = ? ORDER BY last_heartbeat_at DESC");
+  const deleteNodeStmt = db.prepare("DELETE FROM nodes WHERE id = ?");
   const markOfflineNodesStmt = db.prepare(`
     UPDATE nodes SET status = 'offline'
     WHERE last_heartbeat_at < ?
@@ -457,6 +458,11 @@ listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] 
       lastHeartbeatAt: r.last_heartbeat_at,
       status: r.status,
     }));
+  },
+
+  deleteNode(nodeId: string): boolean {
+    const result = deleteNodeStmt.run(nodeId);
+    return (result as { changes: number }).changes > 0;
   },
 };
 

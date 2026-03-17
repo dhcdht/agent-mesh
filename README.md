@@ -138,8 +138,11 @@ pnpm cli task:list --mesh-id my-mesh
 # 查看 lead 收件箱
 pnpm cli inbox:list --mesh-id my-mesh --agent-id lead
 
-# 列出节点（扩缩容）
+# 列出节点
 pnpm cli node:list [--mesh-id my-mesh]
+
+# 下线节点
+pnpm cli node:delete --id node-1
 
 # Chat 交互模式：与 agents 交流，查看 agent 间讨论
 pnpm cli chat --mesh-id my-mesh

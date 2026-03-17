@@ -55,6 +55,16 @@ export async function buildServer(dbPath: string): Promise<FastifyInstance> {
 
   await app.register(
     async (api) => {
+      const apiKey = process.env.MESH_API_KEY;
+      if (apiKey) {
+        api.addHook("onRequest", async (request, reply) => {
+          const auth = request.headers.authorization;
+          const token = auth?.startsWith("Bearer ") ? auth.slice(7) : "";
+          if (token !== apiKey) {
+            return reply.code(401).send({ error: "unauthorized", message: "Invalid or missing API key" });
+          }
+        });
+      }
       await registerMeshRoutes(api);
       await registerRepoRoutes(api);
       await registerAgentRoutes(api);

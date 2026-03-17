@@ -285,6 +285,16 @@ describe("coordinator api", () => {
     const filteredData = filtered.json() as { items: Array<{ id: string; meshId: string }> };
     expect(filteredData.items.every((n) => n.meshId === "mesh-nodes")).toBe(true);
 
+    const del = await app.inject({ method: "DELETE", url: "/api/v1/nodes/node-a" });
+    expect(del.statusCode).toBe(204);
+
+    const afterDel = await app.inject({ method: "GET", url: "/api/v1/nodes?meshId=mesh-nodes" });
+    const afterData = afterDel.json() as { items: Array<{ id: string }> };
+    expect(afterData.items.some((n) => n.id === "node-a")).toBe(false);
+
+    const del404 = await app.inject({ method: "DELETE", url: "/api/v1/nodes/nonexistent" });
+    expect(del404.statusCode).toBe(404);
+
     await app.close();
   });
 });

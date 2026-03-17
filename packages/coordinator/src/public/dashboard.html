@@ -34,6 +34,16 @@
     <input type="text" id="meshInput" placeholder="或输入 mesh ID" style="padding:0.5rem;width:150px;margin-left:0.5rem;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#eee;">
     <button id="refreshBtn">刷新</button>
     <label style="margin-left:1rem;"><input type="checkbox" id="autoRefresh" checked> 自动刷新 (10s)</label>
+    <input type="password" id="apiKeyInput" placeholder="API Key (可选)" style="padding:0.5rem;width:120px;margin-left:0.5rem;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#eee;">
+  </div>
+  <div class="section" id="nodesSection">
+    <h2>Nodes</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Mesh</th><th>状态</th><th>最后心跳</th><th>操作</th></tr>
+      </thead>
+      <tbody id="nodesBody"></tbody>
+    </table>
   </div>
   <div class="section" id="agentsSection">
     <h2>Agents</h2>
@@ -63,12 +73,18 @@
     const API = '/api/v1';
     const meshSelect = document.getElementById('meshSelect');
     const meshInput = document.getElementById('meshInput');
+    const nodesBody = document.getElementById('nodesBody');
     const agentsBody = document.getElementById('agentsBody');
     const tasksBody = document.getElementById('tasksBody');
     const inboxBody = document.getElementById('inboxBody');
     const refreshBtn = document.getElementById('refreshBtn');
     const autoRefreshEl = document.getElementById('autoRefresh');
+    const apiKeyInput = document.getElementById('apiKeyInput');
     const errEl = document.getElementById('error');
+
+    function getApiKey() {
+      return apiKeyInput?.value?.trim() || sessionStorage.getItem('meshApiKey') || '';
+    }
 
     function getMeshId() {
       const fromInput = meshInput.value.trim();
@@ -76,8 +92,11 @@
       return meshSelect.value || '';
     }
 
-    async function fetchJson(path) {
-      const r = await fetch(API + path);
+    async function fetchJson(path, init) {
+      const apiKey = getApiKey();
+      const headers = { ...(init?.headers || {}) };
+      if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+      const r = await fetch(API + path, { ...init, headers });
       if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
       return r.json();
     }
@@ -91,6 +110,44 @@
         if (saved) meshSelect.value = saved;
       } catch (e) {
         meshSelect.innerHTML = '<option value="">加载失败</option>';
+      }
+    }
+
+    async function loadNodes() {
+      const meshId = getMeshId();
+      const q = meshId ? '?meshId=' + encodeURIComponent(meshId) : '';
+      try {
+        const { items } = await fetchJson('/nodes' + q);
+        nodesBody.innerHTML = items.length === 0
+          ? '<tr><td colspan="5">无节点</td></tr>'
+          : items.map(n => `
+            <tr>
+              <td>${n.id}</td>
+              <td>${n.meshId}</td>
+              <td class="status-${n.status}">${n.status}</td>
+              <td>${n.lastHeartbeatAt ? new Date(n.lastHeartbeatAt).toLocaleString() : '-'}</td>
+              <td><button data-id="${n.id}" data-action="delete-node">下线</button></td>
+            </tr>
+          `).join('');
+        nodesBody.querySelectorAll('[data-action="delete-node"]').forEach(btn => {
+          btn.onclick = () => deleteNode(btn.dataset.id);
+        });
+      } catch (e) {
+        nodesBody.innerHTML = '<tr><td colspan="5" class="error">加载失败</td></tr>';
+      }
+    }
+
+    async function deleteNode(nodeId) {
+      try {
+        const apiKey = getApiKey();
+        const headers = {};
+        if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+        const r = await fetch(API + '/nodes/' + encodeURIComponent(nodeId), { method: 'DELETE', headers });
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        await loadNodes();
+        errEl.textContent = '';
+      } catch (e) {
+        errEl.textContent = '下线失败: ' + e.message;
       }
     }
 
@@ -142,12 +199,17 @@
 
     async function markComplete(taskId) {
       try {
-        await fetch(API + '/tasks/' + taskId, {
+        const apiKey = getApiKey();
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+        const r = await fetch(API + '/tasks/' + taskId, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ status: 'completed' }),
         });
-        loadTasks();
+        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+        await loadTasks();
+        errEl.textContent = '';
       } catch (e) {
         errEl.textContent = '标记失败: ' + e.message;
       }
@@ -174,6 +236,7 @@
     function refresh() {
       const id = getMeshId();
       if (id) localStorage.setItem('meshId', id);
+      loadNodes();
       loadAgents();
       loadTasks();
       loadInbox();
@@ -183,6 +246,15 @@
     meshSelect.onchange = () => { meshInput.value = ''; refresh(); };
     meshInput.onchange = () => { meshSelect.value = ''; refresh(); };
     refreshBtn.onclick = refresh;
+    apiKeyInput?.addEventListener('change', () => {
+      const v = apiKeyInput.value.trim();
+      if (v) sessionStorage.setItem('meshApiKey', v);
+      else sessionStorage.removeItem('meshApiKey');
+      refresh();
+    });
+    if (sessionStorage.getItem('meshApiKey')) {
+      apiKeyInput.placeholder = 'API Key (已设置)';
+    }
 
     loadMeshes().then(() => {
       const saved = localStorage.getItem('meshId');

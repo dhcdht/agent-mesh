@@ -85,4 +85,5 @@ export interface CoordinatorStorage {
   markOfflineNodes(thresholdMs: number): void;
   isNodeOnline(nodeId: string): boolean;
   listNodes(meshId?: string): Array<{ id: string; meshId: string; lastHeartbeatAt: string; status: string }>;
+  deleteNode(nodeId: string): boolean;
 }

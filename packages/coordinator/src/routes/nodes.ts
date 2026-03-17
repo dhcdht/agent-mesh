@@ -37,4 +37,13 @@ export async function registerNodeRoutes(app: FastifyInstance): Promise<void> {
     const items = app.storage.listNodes(meshId);
     return reply.send({ items });
   });
+
+  app.delete<{ Params: { nodeId: string } }>("/nodes/:nodeId", async (request, reply) => {
+    const { nodeId } = request.params;
+    const deleted = app.storage.deleteNode(nodeId);
+    if (!deleted) {
+      return reply.code(404).send({ error: "node not found" });
+    }
+    return reply.code(204).send();
+  });
 }

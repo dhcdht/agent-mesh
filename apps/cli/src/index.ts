@@ -112,6 +112,17 @@ program
   });
 
 program
+  .command("node:delete")
+  .description("Remove a node from registry (force offline)")
+  .requiredOption("--id <nodeId>", "Node id")
+  .action(async (cmdOptions) => {
+    const global = program.opts<{ coordinator: string; apiKey?: string }>();
+    const client = withClient(global);
+    await client.request("DELETE", `/api/v1/nodes/${encodeURIComponent(cmdOptions.id)}`);
+    console.log("Node removed");
+  });
+
+program
   .command("task:create")
   .requiredOption("--id <id>", "Task id")
   .requiredOption("--mesh-id <meshId>", "Mesh id")
