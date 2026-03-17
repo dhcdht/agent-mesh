@@ -3,5 +3,10 @@ node_modules/
 dist/
 .tmp/
 *.db
+*.db-shm
+*.db-wal
 .env
 .env.local
+teams/
+config/dev-mesh.yaml
+packages/node/config/

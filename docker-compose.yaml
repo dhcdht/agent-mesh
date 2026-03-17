@@ -1,0 +1,31 @@
+version: "3.8"
+
+services:
+  coordinator:
+    build:
+      context: .
+      target: coordinator
+    ports:
+      - "3000:3000"
+    volumes:
+      - coordinator-data:/app/data
+    environment:
+      - NODE_ENV=production
+
+  node:
+    build:
+      context: .
+      target: node
+    volumes:
+      - ./mesh.yaml:/app/mesh.yaml
+      - /path/to/repo1:/repo1
+      - /path/to/repo2:/repo2
+    environment:
+      - MESH_COORDINATOR_URL=http://coordinator:3000
+    depends_on:
+      - coordinator
+    deploy:
+      replicas: 2
+
+volumes:
+  coordinator-data:

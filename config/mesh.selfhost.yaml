@@ -1,0 +1,46 @@
+# Agent Mesh 自举配置：用 Agent Mesh 开发 Agent Mesh
+# 三个 agent 协作：测试、插件、研究
+# 使用前请将 path 修改为你的项目根目录绝对路径
+
+mesh:
+  id: agent-mesh-dev
+  name: Agent Mesh 自举开发
+
+repos:
+  - id: repo-test
+    path: /Users/dhcdht/Desktop/Projects/agent-mesh
+    agent:
+      id: agent-tester
+      name: 测试 Agent
+      cliType: stdin
+      cliConfig:
+        command: pnpm
+        args: [test]
+        argsOnly: true
+        timeoutMs: 120000
+
+  - id: repo-plugin
+    path: /Users/dhcdht/Desktop/Projects/agent-mesh
+    agent:
+      id: agent-plugin
+      name: 插件 Agent
+      cliType: acp
+      cliConfig:
+        timeoutMs: 180000
+
+  - id: repo-docs
+    path: /Users/dhcdht/Desktop/Projects/agent-mesh
+    agent:
+      id: agent-research
+      name: 研究 Agent
+      cliType: acp
+      cliConfig:
+        timeoutMs: 180000
+
+coordinator:
+  url: http://localhost:3000
+  apiKey:
+
+node:
+  id: ${MESH_NODE_ID:-node-selfhost}
+  pollIntervalMs: 3000

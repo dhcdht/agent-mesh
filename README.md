@@ -137,17 +137,44 @@ pnpm cli task:list --mesh-id my-mesh
 
 # 查看 lead 收件箱
 pnpm cli inbox:list --mesh-id my-mesh --agent-id lead
+
+# Chat 交互模式：与 agents 交流，查看 agent 间讨论
+pnpm cli chat --mesh-id my-mesh
 ```
 
 ## 适配器
 
 | cliType | 说明 | 配置示例 |
 |---------|------|----------|
-| `opencode` | HTTP API（需 `opencode serve`） | `serverUrl`, `endpoint`, `timeoutMs` |
+| `opencode` | HTTP API（需 `opencode serve` + 认证） | `serverUrl`, `endpoint`, `timeoutMs` |
 | `claude-code` | 写入 Claude Code inbox 文件 | `teamName`, `baseDir` |
 | `stdin` | 子进程执行，prompt 作为参数 | `command`, `args`, `timeoutMs` |
 
+**前置条件**：使用 OpenCode 适配器前，需先配置认证：
+```bash
+opencode providers  # 配置 API key
+opencode serve --port 4096  # 启动 HTTP 服务
+```
+
 详见 [Phase 3 适配器文档](docs/phase3-adapters.md)。
+
+## Docker 部署
+
+```bash
+# 构建镜像
+docker build -t agent-mesh/coordinator .
+docker build -t agent-mesh/node .
+
+# 启动 Coordinator
+docker run -d -p 3000:3000 agent-mesh/coordinator
+
+# 启动 Node（需配置 mesh.yaml）
+docker run -d -e MESH_COORDINATOR_URL=http://coordinator:3000 \
+  -v ./mesh.yaml:/app/mesh.yaml agent-mesh/node
+
+# 扩缩容
+docker-compose up -d --scale node=5
+```
 
 ## 项目结构
 
@@ -186,11 +213,16 @@ pnpm coordinator
 
 ## 文档
 
+- [AGENTS.md](AGENTS.md) — 项目开发指南（自举、Commit、文档维护、聊天工具接入）
 - [Coordinator 安装与 API](docs/phase1-coordinator-install.md)
 - [CLI 使用说明](docs/phase1-cli-usage.md)
+- [Chat 交互模式](docs/chat-usage.md) — 与 agents 交流、查看讨论
+- [Agent 通信](docs/agent-communication.md)
+- [自举](docs/selfhost.md) — 用 Agent Mesh 开发 Agent Mesh
 - [Node 演示](docs/phase1-node-demo.md)
 - [Phase 3 适配器](docs/phase3-adapters.md)
 - [Phase 4 可观测性](docs/phase4-observability.md)
+- [聊天工具接入计划](docs/chat-plugin-integration.md)
 
 ## License
 
