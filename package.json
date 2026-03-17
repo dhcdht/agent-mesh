@@ -8,7 +8,11 @@
   "scripts": {
     "build": "pnpm -r run build",
     "test": "pnpm -r run test",
-    "dev": "pnpm -r run dev"
+    "dev": "pnpm -r run dev",
+    "coordinator": "pnpm --filter @agent-mesh/coordinator dev",
+    "node": "pnpm --filter @agent-mesh/node start config/mesh.example.yaml",
+    "cli": "pnpm --filter @agent-mesh/cli start --",
+    "demo": "./scripts/phase1-e2e-demo.sh"
   },
   "devDependencies": {
     "typescript": "^5.3.0"
