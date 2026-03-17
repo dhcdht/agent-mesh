@@ -1,4 +1,4 @@
-type HttpMethod = "GET" | "POST" | "PATCH";
+type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
 export interface CliClientOptions {
   baseUrl: string;
