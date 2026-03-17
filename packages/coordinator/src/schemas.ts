@@ -43,8 +43,6 @@ export const createTaskSchema = z.object({
   description: z.string().min(1),
   owner: idSchema,
   repoId: idSchema,
-  blocks: z.array(idSchema).optional(),
-  blockedBy: z.array(idSchema).optional(),
 });
 
 export const updateTaskSchema = z
@@ -54,8 +52,6 @@ export const updateTaskSchema = z
     status: z.enum(["pending", "in_progress", "completed", "deleted"]).optional(),
     owner: idSchema.optional(),
     repoId: idSchema.optional(),
-    blocks: z.array(idSchema).optional(),
-    blockedBy: z.array(idSchema).optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: "at least one field must be provided",
@@ -68,4 +64,5 @@ export const createMessageSchema = z.object({
   to: idSchema,
   type: z.string().min(1),
   payload: z.unknown(),
+  taskId: idSchema.optional(),
 });

@@ -23,54 +23,6 @@ async function createApp() {
 }
 
 describe("coordinator api", () => {
-  it("rejects cyclic task dependencies", async () => {
-    const app = await createApp();
-
-    await app.inject({
-      method: "POST",
-      url: "/api/v1/meshes",
-      payload: { id: "mesh-1", name: "mesh one" },
-    });
-
-    await app.inject({
-      method: "POST",
-      url: "/api/v1/tasks",
-      payload: {
-        id: "t1",
-        meshId: "mesh-1",
-        subject: "task 1",
-        description: "task 1",
-        owner: "agent-a",
-        repoId: "repo-a",
-      },
-    });
-
-    await app.inject({
-      method: "POST",
-      url: "/api/v1/tasks",
-      payload: {
-        id: "t2",
-        meshId: "mesh-1",
-        subject: "task 2",
-        description: "task 2",
-        owner: "agent-a",
-        repoId: "repo-a",
-        blockedBy: ["t1"],
-      },
-    });
-
-    const cyclic = await app.inject({
-      method: "PATCH",
-      url: "/api/v1/tasks/t1",
-      payload: {
-        blockedBy: ["t2"],
-      },
-    });
-
-    expect(cyclic.statusCode).toBe(409);
-    await app.close();
-  });
-
   it("supports inbox and read flow", async () => {
     const app = await createApp();
 
@@ -111,6 +63,77 @@ describe("coordinator api", () => {
     });
     expect(read.statusCode).toBe(200);
     expect((read.json() as { read: boolean }).read).toBe(true);
+
+    await app.close();
+  });
+
+  it("supports broadcast (to=*) and task-based messages", async () => {
+    const app = await createApp();
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/meshes",
+      payload: { id: "mesh-bc", name: "broadcast test" },
+    });
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/agents/register",
+      payload: {
+        id: "agent-x",
+        meshId: "mesh-bc",
+        name: "Agent X",
+        repoId: "repo-x",
+        cliType: "noop",
+        cliConfig: {},
+      },
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/agents/register",
+      payload: {
+        id: "agent-y",
+        meshId: "mesh-bc",
+        name: "Agent Y",
+        repoId: "repo-y",
+        cliType: "noop",
+        cliConfig: {},
+      },
+    });
+
+    const broadcast = await app.inject({
+      method: "POST",
+      url: "/api/v1/messages",
+      payload: {
+        id: "bc1",
+        meshId: "mesh-bc",
+        from: "lead",
+        to: "*",
+        type: "broadcast",
+        payload: { text: "hello all" },
+        taskId: "task-1",
+      },
+    });
+    expect(broadcast.statusCode).toBe(201);
+    const bcData = broadcast.json() as { broadcast: boolean; created: Array<{ id: string; to: string }> };
+    expect(bcData.broadcast).toBe(true);
+    expect(bcData.created).toHaveLength(2);
+
+    const inboxX = await app.inject({
+      method: "GET",
+      url: "/api/v1/messages/agent-x/inbox?meshId=mesh-bc&unreadOnly=true",
+    });
+    expect(inboxX.statusCode).toBe(200);
+    expect((inboxX.json() as { items: unknown[] }).items).toHaveLength(1);
+
+    const taskMsgs = await app.inject({
+      method: "GET",
+      url: "/api/v1/tasks/task-1/messages?meshId=mesh-bc",
+    });
+    expect(taskMsgs.statusCode).toBe(200);
+    const tmData = taskMsgs.json() as { items: Array<{ taskId?: string; from: string }> };
+    expect(tmData.items.length).toBeGreaterThanOrEqual(1);
+    expect(tmData.items.some((m) => m.from === "lead")).toBe(true);
 
     await app.close();
   });

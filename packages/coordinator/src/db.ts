@@ -1,4 +1,4 @@
-import { hasCycle, type Agent, type Mesh, type Message, type Repo, type Task } from "@agent-mesh/shared";
+import { type Agent, type Mesh, type Message, type Repo, type Task } from "@agent-mesh/shared";
 import Database from "better-sqlite3";
 import type {
   CoordinatorStorage,
@@ -61,8 +61,8 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       status TEXT NOT NULL,
       owner TEXT NOT NULL,
       repo_id TEXT NOT NULL,
-      blocks TEXT NOT NULL,
-      blocked_by TEXT NOT NULL,
+      
+      
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       FOREIGN KEY(mesh_id) REFERENCES meshes(id)
@@ -77,9 +77,17 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       payload TEXT NOT NULL,
       timestamp TEXT NOT NULL,
       is_read INTEGER NOT NULL,
+      task_id TEXT,
       FOREIGN KEY(mesh_id) REFERENCES meshes(id)
     );
   `);
+
+  // Migration: add task_id if table existed without it
+  try {
+    db.exec("ALTER TABLE messages ADD COLUMN task_id TEXT");
+  } catch (_) {
+    // column already exists
+  }
 
   const createMeshStmt = db.prepare(
     "INSERT INTO meshes (id, name, status, created_at, completed_at) VALUES (?, ?, ?, ?, ?)"
@@ -112,23 +120,26 @@ export function createStorage(dbPath: string): CoordinatorStorage {
     "SELECT * FROM agents WHERE mesh_id = ? AND node_id = ?"
   );
 
-  const createTaskStmt = db.prepare(
-    "INSERT INTO tasks (id, mesh_id, subject, description, status, owner, repo_id, blocks, blocked_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  );
+const createTaskStmt = db.prepare(
+  "INSERT INTO tasks (id, mesh_id, subject, description, status, owner, repo_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+);
   const getTaskStmt = db.prepare("SELECT * FROM tasks WHERE id = ?");
   const listTasksByMeshStmt = db.prepare("SELECT * FROM tasks WHERE mesh_id = ?");
   const listTasksByFilterStmt = db.prepare(
     "SELECT * FROM tasks WHERE mesh_id = ? AND (? IS NULL OR owner = ?) AND (? IS NULL OR status = ?)"
   );
   const updateTaskStmt = db.prepare(
-    "UPDATE tasks SET subject = ?, description = ?, status = ?, owner = ?, repo_id = ?, blocks = ?, blocked_by = ?, updated_at = ? WHERE id = ?"
+    "UPDATE tasks SET subject = ?, description = ?, status = ?, owner = ?, repo_id = ?, updated_at = ? WHERE id = ?"
   );
 
   const createMessageStmt = db.prepare(
-    "INSERT INTO messages (id, mesh_id, sender, recipient, type, payload, timestamp, is_read) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO messages (id, mesh_id, sender, recipient, type, payload, timestamp, is_read, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
   const listInboxStmt = db.prepare(
     "SELECT * FROM messages WHERE mesh_id = ? AND recipient = ? AND (? = 0 OR is_read = 0) ORDER BY timestamp ASC"
+  );
+  const listMessagesByTaskStmt = db.prepare(
+    "SELECT * FROM messages WHERE mesh_id = ? AND task_id = ? ORDER BY timestamp ASC"
   );
   const markMessageReadStmt = db.prepare("UPDATE messages SET is_read = 1 WHERE id = ?");
   const getMessageStmt = db.prepare("SELECT * FROM messages WHERE id = ?");
@@ -179,8 +190,6 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       status: row.status,
       owner: row.owner,
       repoId: row.repo_id,
-      blocks: parseJson<string[]>(row.blocks),
-      blockedBy: parseJson<string[]>(row.blocked_by),
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -196,6 +205,7 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       payload: parseJson<unknown>(row.payload),
       timestamp: row.timestamp,
       read: row.is_read === 1,
+      taskId: row.task_id ?? undefined,
     };
   }
 
@@ -280,134 +290,126 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       return rows.map(mapAgent);
     },
 
-    createTask(input: CreateTaskInput): Task {
-      const now = nowIso();
-      const task: Task = {
-        id: input.id,
-        meshId: input.meshId,
-        subject: input.subject,
-        description: input.description,
-        status: "pending",
-        owner: input.owner,
-        repoId: input.repoId,
-        blocks: input.blocks ?? [],
-        blockedBy: input.blockedBy ?? [],
-        createdAt: now,
-        updatedAt: now,
-      };
-      createTaskStmt.run(
-        task.id,
-        task.meshId,
-        task.subject,
-        task.description,
-        task.status,
-        task.owner,
-        task.repoId,
-        JSON.stringify(task.blocks),
-        JSON.stringify(task.blockedBy),
-        task.createdAt,
-        task.updatedAt
-      );
-      return task;
-    },
+createTask(input: CreateTaskInput): Task {
+  const now = nowIso();
+  const task: Task = {
+    id: input.id,
+    meshId: input.meshId,
+    subject: input.subject,
+    description: input.description,
+    status: "pending",
+    owner: input.owner,
+    repoId: input.repoId,
+    createdAt: now,
+    updatedAt: now,
+  };
+  createTaskStmt.run(
+    task.id,
+    task.meshId,
+    task.subject,
+    task.description,
+    task.status,
+    task.owner,
+    task.repoId,
+    task.createdAt,
+    task.updatedAt
+  );
+  return task;
+},
 
     getTask(taskId: string): Task | undefined {
       const row = getTaskStmt.get(taskId);
       return row ? mapTask(row) : undefined;
     },
 
-    updateTask(taskId: string, patch: UpdateTaskInput): Task | undefined {
-      const current = storage.getTask(taskId);
-      if (!current) {
-        return undefined;
-      }
-      const next: Task = {
-        ...current,
-        ...patch,
-        blocks: patch.blocks ?? current.blocks,
-        blockedBy: patch.blockedBy ?? current.blockedBy,
-        updatedAt: nowIso(),
-      };
-      updateTaskStmt.run(
-        next.subject,
-        next.description,
-        next.status,
-        next.owner,
-        next.repoId,
-        JSON.stringify(next.blocks),
-        JSON.stringify(next.blockedBy),
-        next.updatedAt,
-        taskId
-      );
-      return next;
-    },
-
-    listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] {
-      const rows = listTasksByFilterStmt.all(
-        filters.meshId,
-        filters.owner ?? null,
-        filters.owner ?? null,
-        filters.status ?? null,
-        filters.status ?? null
-      );
-      return rows.map(mapTask);
-    },
-
-    validateTaskGraph(meshId: string, candidate: Task): boolean {
-      const tasks = listTasksByMeshStmt.all(meshId).map(mapTask);
-      const filtered = tasks.filter((item) => item.id !== candidate.id);
-      const merged = [...filtered, candidate].map((item) => ({ id: item.id, blockedBy: item.blockedBy }));
-      return !hasCycle(merged);
-    },
-
-    createMessage(input: CreateMessageInput): Message {
-      const message: Message = {
-        id: input.id,
-        meshId: input.meshId,
-        from: input.from,
-        to: input.to,
-        type: input.type,
-        payload: input.payload,
-        timestamp: nowIso(),
-        read: false,
-      };
-      createMessageStmt.run(
-        message.id,
-        message.meshId,
-        message.from,
-        message.to,
-        message.type,
-        JSON.stringify(message.payload),
-        message.timestamp,
-        0
-      );
-      return message;
-    },
-
-    listInbox(params: { meshId: string; agentId: string; unreadOnly: boolean }): Message[] {
-      return listInboxStmt
-        .all(params.meshId, params.agentId, params.unreadOnly ? 1 : 0)
-        .map(mapMessage);
-    },
-
-    markMessageRead(messageId: string): Message | undefined {
-      markMessageReadStmt.run(messageId);
-      const row = getMessageStmt.get(messageId);
-      return row ? mapMessage(row) : undefined;
-    },
-
-    getMetrics(): { meshes: number; tasks: Record<string, number>; agents: number; messages: number } {
-      const meshes = (countMeshesStmt.get() as { c: number }).c;
-      const agents = (countAgentsStmt.get() as { c: number }).c;
-      const messages = (countMessagesStmt.get() as { c: number }).c;
-      const taskRows = countTasksByStatusStmt.all() as { status: string; c: number }[];
-      const tasks: Record<string, number> = {};
-      for (const row of taskRows) {
-        tasks[row.status] = row.c;
-      }
-      return { meshes, tasks, agents, messages };
-    },
+updateTask(taskId: string, patch: UpdateTaskInput): Task | undefined {
+  const current = storage.getTask(taskId);
+  if (!current) {
+    return undefined;
+  }
+  const next: Task = {
+    ...current,
+    ...patch,
+    updatedAt: nowIso(),
   };
+  updateTaskStmt.run(
+    next.subject,
+    next.description,
+    next.status,
+    next.owner,
+    next.repoId,
+    next.updatedAt,
+    taskId
+  );
+  return next;
+},
 
-  return storage;
+listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] {
+  const rows = listTasksByFilterStmt.all(
+    filters.meshId,
+    filters.owner ?? null,
+    filters.owner ?? null,
+    filters.status ?? null,
+    filters.status ?? null
+  );
+  return rows.map(mapTask);
+},
+
+  createMessage(input: CreateMessageInput): Message {
+    const message: Message = {
+      id: input.id,
+      meshId: input.meshId,
+      from: input.from,
+      to: input.to,
+      type: input.type,
+      payload: input.payload,
+      timestamp: nowIso(),
+      read: false,
+      taskId: input.taskId,
+    };
+    createMessageStmt.run(
+      message.id,
+      message.meshId,
+      message.from,
+      message.to,
+      message.type,
+      JSON.stringify(message.payload),
+      message.timestamp,
+      0,
+      message.taskId ?? null
+    );
+    return message;
+  },
+
+  listInbox(params: { meshId: string; agentId: string; unreadOnly: boolean }): Message[] {
+    return listInboxStmt
+      .all(params.meshId, params.agentId, params.unreadOnly ? 1 : 0)
+      .map(mapMessage);
+  },
+
+  listMessagesByTask(params: { meshId: string; taskId: string }): Message[] {
+    return listMessagesByTaskStmt.all(params.meshId, params.taskId).map(mapMessage);
+  },
+
+  markMessageRead(messageId: string): Message | undefined {
+    markMessageReadStmt.run(messageId);
+    const row = getMessageStmt.get(messageId);
+    return row ? mapMessage(row) : undefined;
+  },
+
+  getMetrics(): { meshes: number; tasks: Record<string, number>; agents: number; messages: number } {
+    const meshes = (countMeshesStmt.get() as { c: number }).c;
+    const agents = (countAgentsStmt.get() as { c: number }).c;
+    const messages = (countMessagesStmt.get() as { c: number }).c;
+    const taskRows = countTasksByStatusStmt.all() as { status: string; c: number }[];
+    const tasks: Record<string, number> = {};
+    for (const row of taskRows) {
+      tasks[row.status] = row.c;
+    }
+    return { meshes, tasks, agents, messages };
+  },
+};
+
+return storage;
 }
+

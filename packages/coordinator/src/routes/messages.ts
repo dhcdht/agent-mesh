@@ -1,6 +1,10 @@
 import type { FastifyInstance } from "fastify";
+import { BROADCAST_RECIPIENT } from "@agent-mesh/shared";
 import { createMessageSchema } from "../schemas.js";
 import type { CreateMessageInput } from "../types.js";
+
+/** 广播收件人别名 */
+const BROADCAST_ALIASES = [BROADCAST_RECIPIENT, "all"];
 
 export async function registerMessageRoutes(app: FastifyInstance): Promise<void> {
   app.post("/messages", async (request, reply) => {
@@ -9,8 +13,35 @@ export async function registerMessageRoutes(app: FastifyInstance): Promise<void>
       return reply.code(400).send({ error: parsed.error.flatten() });
     }
 
-    if (!app.storage.getMesh(parsed.data.meshId)) {
+    const mesh = app.storage.getMesh(parsed.data.meshId);
+    if (!mesh) {
       return reply.code(404).send({ error: "mesh not found" });
+    }
+
+    const to = parsed.data.to;
+    const isBroadcast = BROADCAST_ALIASES.includes(to);
+
+    if (isBroadcast) {
+      const agents = app.storage.listAgents(parsed.data.meshId);
+      const recipients = agents
+        .map((a) => a.id)
+        .filter((id) => id !== parsed.data.from);
+      const created: Array<{ id: string; to: string }> = [];
+      for (const agentId of recipients) {
+        const msgId = `${parsed.data.id}-${agentId}`;
+        try {
+          const m = app.storage.createMessage({
+            ...parsed.data,
+            id: msgId,
+            to: agentId,
+            type: parsed.data.type === "message" ? "broadcast" : parsed.data.type,
+          } as CreateMessageInput);
+          created.push({ id: m.id, to: m.to });
+        } catch {
+          // 已存在则跳过
+        }
+      }
+      return reply.code(201).send({ broadcast: true, created });
     }
 
     try {

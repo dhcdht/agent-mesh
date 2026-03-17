@@ -1,40 +1,33 @@
-# Agent Mesh 配置示例
-# 复制为 mesh.yaml 并按需修改
+# Agent Mesh 示例配置
+# 复制为 mesh.yaml 并修改
 
 mesh:
-  id: mesh-example
-  name: 示例 Mesh
+  id: my-mesh
+  name: My Project Mesh
 
-# Repo 与 Agent 配置（每 repo 单 agent）
 repos:
-  - id: repo-frontend
-    path: /path/to/frontend
-    gitRemote: https://github.com/org/frontend.git
+  - id: frontend-repo
+    path: /repo/frontend
     agent:
       id: agent-frontend
-      name: 前端 Agent
+      name: Frontend Agent
       cliType: opencode
       cliConfig:
         serverUrl: http://localhost:4096
-        model: claude-sonnet
 
-  - id: repo-backend
-    path: /path/to/backend
-    gitRemote: https://github.com/org/backend.git
+  - id: backend-repo
+    path: /repo/backend
     agent:
       id: agent-backend
-      name: 后端 Agent
+      name: Backend Agent
       cliType: claude-code
       cliConfig:
-        teamName: my-mesh
-        # baseDir 可选，默认 ~/.claude
+        teamName: my-team
 
-# Coordinator 连接（Node 用）
 coordinator:
-  url: http://localhost:3000
-  apiKey: ${MESH_API_KEY}  # 从环境变量读取
+  url: ${MESH_COORDINATOR_URL:-http://localhost:3000}
+  apiKey: ${MESH_API_KEY:-}
 
-# Node 配置（可选）
 node:
-  id: node-1
-  nodeSecret: ${MESH_NODE_SECRET}  # 从环境变量读取，与 Coordinator 预配置一致
+  id: ${MESH_NODE_ID:-node-1}
+  pollIntervalMs: 5000

@@ -37,8 +37,6 @@ export interface CreateTaskInput {
   description: string;
   owner: string;
   repoId: string;
-  blocks?: string[];
-  blockedBy?: string[];
 }
 
 export interface UpdateTaskInput {
@@ -47,8 +45,6 @@ export interface UpdateTaskInput {
   status?: Task["status"];
   owner?: string;
   repoId?: string;
-  blocks?: string[];
-  blockedBy?: string[];
 }
 
 export interface CreateMessageInput {
@@ -58,6 +54,7 @@ export interface CreateMessageInput {
   to: string;
   type: string;
   payload: unknown;
+  taskId?: string;
 }
 
 export interface CoordinatorStorage {
@@ -76,10 +73,10 @@ export interface CoordinatorStorage {
   updateTask(taskId: string, patch: UpdateTaskInput): Task | undefined;
   getTask(taskId: string): Task | undefined;
   listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[];
-  validateTaskGraph(meshId: string, candidate: Task): boolean;
 
   createMessage(input: CreateMessageInput): Message;
   listInbox(params: { meshId: string; agentId: string; unreadOnly: boolean }): Message[];
+  listMessagesByTask(params: { meshId: string; taskId: string }): Message[];
   markMessageRead(messageId: string): Message | undefined;
 
   getMetrics(): { meshes: number; tasks: Record<string, number>; agents: number; messages: number };
