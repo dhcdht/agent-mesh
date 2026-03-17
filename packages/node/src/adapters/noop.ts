@@ -1,5 +1,5 @@
 import type { Task } from "@agent-mesh/shared";
-import type { AdapterExecutionResult, AgentAdapter } from "./types.js";
+import type { AdapterExecutionResult, AgentAdapter, DeliverResult, MessageContext } from "./types.js";
 
 export class NoopAdapter implements AgentAdapter {
   constructor(private readonly agentId: string) {}
@@ -13,5 +13,9 @@ export class NoopAdapter implements AgentAdapter {
         subject: task.subject,
       },
     };
+  }
+
+  async deliverMessage(_ctx: MessageContext): Promise<DeliverResult> {
+    return { status: "delivered" };
   }
 }

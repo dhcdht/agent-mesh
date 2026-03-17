@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { Task } from "@agent-mesh/shared";
-import type { AdapterExecutionResult, AgentAdapter } from "./types.js";
+import type { AdapterExecutionResult, AgentAdapter, DeliverResult, MessageContext } from "./types.js";
 
 interface ClaudeCodeAdapterConfig {
   teamName: string;
@@ -72,5 +72,35 @@ export class ClaudeCodeAdapter implements AgentAdapter {
       summary: `Task ${task.id} written to Claude Code inbox at ${inboxPath}. Run Claude Code to process.`,
       output: { inboxPath, taskId: task.id },
     };
+  }
+
+  async deliverMessage(ctx: MessageContext): Promise<DeliverResult> {
+    const inboxPath = getInboxPath(this.config.baseDir!, this.config.teamName, this.agentId);
+    ensureInboxDir(inboxPath);
+
+    const envelope = {
+      from: ctx.from,
+      text: JSON.stringify({
+        type: ctx.type,
+        payload: ctx.payload,
+        taskId: ctx.taskId,
+        messageId: ctx.id,
+      }),
+      timestamp: new Date().toISOString(),
+      read: false,
+    };
+
+    let entries: unknown[] = [];
+    if (existsSync(inboxPath)) {
+      try {
+        const raw = readFileSync(inboxPath, "utf-8");
+        entries = JSON.parse(raw) as unknown[];
+      } catch {
+        entries = [];
+      }
+    }
+    entries.push(envelope);
+    writeFileSync(inboxPath, JSON.stringify(entries, null, 2), "utf-8");
+    return { status: "delivered" };
   }
 }

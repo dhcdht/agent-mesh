@@ -25,17 +25,15 @@ describe("ClaudeCodeAdapter", () => {
 
     const result = await adapter.execute({
       id: "task-1",
-      meshId: "mesh-1",
-      subject: "Test subject",
-      description: "Test description",
-      status: "pending",
-      owner: "agent-a",
-      repoId: "repo-a",
-      blocks: [],
-      blockedBy: [],
-      createdAt: "",
-      updatedAt: "",
-    });
+meshId: "mesh-1",
+  subject: "Test subject",
+  description: "Test description",
+  status: "pending",
+  owner: "agent-a",
+  repoId: "repo-a",
+  createdAt: "",
+  updatedAt: "",
+});
 
     expect(result.summary).toContain("Task task-1");
     expect(result.summary).toContain("inbox");

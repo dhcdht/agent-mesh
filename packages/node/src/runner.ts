@@ -41,13 +41,30 @@ export async function runNode(config: NodeConfig): Promise<void> {
   while (true) {
     for (const repo of config.repos) {
       const agentId = repo.agent.id;
-      const adapter = createAdapter(repo.agent.cliType, agentId, repo.agent.cliConfig);
+      const adapter = createAdapter(repo.agent.cliType, agentId, repo.agent.cliConfig, repo.path);
 
-      const inbox = await client.listInbox(config.mesh.id, agentId);
+      const inbox = await client.listInbox(config.mesh.id, agentId, true);
       for (const message of inbox) {
         console.log(
-          `[node:${config.node.id}] inbox ${agentId} <- ${message.from}: ${JSON.stringify(message.payload)}`
+          `[node:${config.node.id}] inbox ${agentId} <- ${message.from} (${message.type}): ${JSON.stringify(message.payload)}`
         );
+        if (adapter.deliverMessage) {
+          try {
+            const result = await adapter.deliverMessage({
+              id: message.id,
+              from: message.from,
+              to: message.to,
+              type: message.type,
+              payload: message.payload,
+              taskId: message.taskId,
+            });
+            if (result.status === "failed") {
+              console.error(`[node:${config.node.id}] deliverMessage failed: ${result.error}`);
+            }
+          } catch (e) {
+            console.error(`[node:${config.node.id}] deliverMessage error:`, e);
+          }
+        }
         await client.markMessageRead(message.id);
       }
 
@@ -65,12 +82,13 @@ export async function runNode(config: NodeConfig): Promise<void> {
             meshId: config.mesh.id,
             from: agentId,
             to: "lead",
-            type: "task_completed",
+            type: "done",
             payload: {
               taskId: task.id,
               summary: result.summary,
               output: result.output,
             },
+            taskId: task.id,
           });
 
           console.log(`[node:${config.node.id}] completed task ${task.id}`);
@@ -81,11 +99,12 @@ export async function runNode(config: NodeConfig): Promise<void> {
             meshId: config.mesh.id,
             from: agentId,
             to: "lead",
-            type: "task_failed",
+            type: "failed",
             payload: {
               taskId: task.id,
               error: String(error),
             },
+            taskId: task.id,
           });
         }
       }

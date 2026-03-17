@@ -12,6 +12,7 @@ interface CreateMessageInput {
   to: string;
   type: string;
   payload: unknown;
+  taskId?: string;
 }
 
 export class CoordinatorClient {
@@ -104,9 +105,27 @@ export class CoordinatorClient {
     });
   }
 
-  async listInbox(meshId: string, agentId: string): Promise<Array<{ id: string; from: string; payload: unknown }>> {
-    const response = await this.request<{ items: Array<{ id: string; from: string; payload: unknown }> }>(
-      `/api/v1/messages/${encodeURIComponent(agentId)}/inbox?meshId=${encodeURIComponent(meshId)}&unreadOnly=true`
+  async listInbox(
+    meshId: string,
+    agentId: string,
+    unreadOnly = true
+  ): Promise<Array<{ id: string; from: string; to: string; type: string; payload: unknown; taskId?: string }>> {
+    const response = await this.request<{
+      items: Array<{ id: string; from: string; to: string; type: string; payload: unknown; taskId?: string }>;
+    }>(
+      `/api/v1/messages/${encodeURIComponent(agentId)}/inbox?meshId=${encodeURIComponent(meshId)}&unreadOnly=${unreadOnly}`
+    );
+    return response.items;
+  }
+
+  async listMessagesByTask(
+    meshId: string,
+    taskId: string
+  ): Promise<Array<{ id: string; from: string; to: string; type: string; payload: unknown; taskId?: string }>> {
+    const response = await this.request<{
+      items: Array<{ id: string; from: string; to: string; type: string; payload: unknown; taskId?: string }>;
+    }>(
+      `/api/v1/tasks/${encodeURIComponent(taskId)}/messages?meshId=${encodeURIComponent(meshId)}`
     );
     return response.items;
   }

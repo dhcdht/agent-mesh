@@ -6,16 +6,23 @@ interface StdinAdapterConfig {
   command: string;
   args?: string[];
   timeoutMs: number;
+  cwd?: string;
+  /** 若 true，不把 task 内容追加到 args（用于 pnpm test 等纯命令） */
+  argsOnly?: boolean;
 }
 
 function toConfig(cliConfig: Record<string, unknown>): StdinAdapterConfig {
   const command = String(cliConfig.command ?? "echo");
   const args = Array.isArray(cliConfig.args) ? cliConfig.args.map(String) : [];
   const timeoutMs = Number(cliConfig.timeoutMs ?? 60000);
+  const cwd = cliConfig.cwd ? String(cliConfig.cwd) : undefined;
+  const argsOnly = cliConfig.argsOnly === true;
   return {
     command,
     args,
     timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 60000,
+    cwd,
+    argsOnly,
   };
 }
 
@@ -27,13 +34,16 @@ export class StdinAdapter implements AgentAdapter {
   }
 
   async execute(task: Task): Promise<AdapterExecutionResult> {
-    const prompt = `${task.subject}\n\n${task.description}`;
-    const args = [...this.config.args, prompt];
+    const baseArgs = this.config.args ?? [];
+    const args = this.config.argsOnly
+      ? baseArgs
+      : [...baseArgs, `${task.subject}\n\n${task.description}`];
 
     return new Promise((resolve, reject) => {
       const proc = spawn(this.config.command, args, {
         stdio: ["pipe", "pipe", "pipe"],
         shell: false,
+        cwd: this.config.cwd,
       });
 
       const chunks: Buffer[] = [];

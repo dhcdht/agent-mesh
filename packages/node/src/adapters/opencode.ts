@@ -3,17 +3,17 @@ import type { AdapterExecutionResult, AgentAdapter } from "./types.js";
 
 interface OpenCodeAdapterConfig {
   serverUrl: string;
-  endpoint: string;
   model?: string;
+  username?: string;
+  password?: string;
   timeoutMs: number;
   retryCount: number;
   retryDelayMs: number;
 }
 
-interface OpenCodeResponse {
-  summary?: string;
-  output?: unknown;
-  text?: string;
+interface OpenCodeMessageResponse {
+  info: { id: string };
+  parts: Array<{ type: string; text?: string }>;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -22,17 +22,19 @@ function sleep(ms: number): Promise<void> {
 
 function toConfig(cliConfig: Record<string, unknown>): OpenCodeAdapterConfig {
   const serverUrl = String(cliConfig.serverUrl ?? "http://localhost:4096").replace(/\/$/, "");
-  const endpoint = String(cliConfig.endpoint ?? "/run");
   const model = cliConfig.model ? String(cliConfig.model) : undefined;
-  const timeoutMs = Number(cliConfig.timeoutMs ?? 20000);
+  const username = cliConfig.username ? String(cliConfig.username) : undefined;
+  const password = cliConfig.password ? String(cliConfig.password) : undefined;
+  const timeoutMs = Number(cliConfig.timeoutMs ?? 120000);
   const retryCount = Number(cliConfig.retryCount ?? 2);
   const retryDelayMs = Number(cliConfig.retryDelayMs ?? 1000);
 
   return {
     serverUrl,
-    endpoint,
     model,
-    timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 20000,
+    username,
+    password,
+    timeoutMs: Number.isFinite(timeoutMs) ? timeoutMs : 120000,
     retryCount: Number.isFinite(retryCount) ? retryCount : 2,
     retryDelayMs: Number.isFinite(retryDelayMs) ? retryDelayMs : 1000,
   };
@@ -45,43 +47,68 @@ export class OpenCodeAdapter implements AgentAdapter {
     this.config = toConfig(cliConfig);
   }
 
+  private getHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+    };
+    if (this.config.username && this.config.password) {
+      const credentials = Buffer.from(`${this.config.username}:${this.config.password}`).toString("base64");
+      headers["Authorization"] = `Basic ${credentials}`;
+    }
+    return headers;
+  }
+
   async execute(task: Task): Promise<AdapterExecutionResult> {
     let lastError: unknown;
 
     for (let attempt = 0; attempt <= this.config.retryCount; attempt += 1) {
       try {
+        const headers = this.getHeaders();
+        const prompt = `You are agent ${this.agentId}. Complete task ${task.id}: ${task.subject}\n\n${task.description}`;
+
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
-        const response = await fetch(`${this.config.serverUrl}${this.config.endpoint}`, {
+        const sessionRes = await fetch(`${this.config.serverUrl}/session`, {
           method: "POST",
-          headers: {
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            task: {
-              id: task.id,
-              subject: task.subject,
-              description: task.description,
-              repoId: task.repoId,
-            },
-            prompt: `You are agent ${this.agentId}. Complete task ${task.id}: ${task.subject}`,
-          }),
+          headers,
+          body: JSON.stringify({ title: `Task: ${task.subject}` }),
           signal: controller.signal,
         });
 
         clearTimeout(timeout);
 
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`opencode error ${response.status}: ${text}`);
+        if (!sessionRes.ok) {
+          const text = await sessionRes.text();
+          throw new Error(`create session failed: ${sessionRes.status} ${text}`);
         }
 
-        const payload = (await response.json()) as OpenCodeResponse;
+        const session = (await sessionRes.json()) as { id: string };
+
+        const msgTimeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
+        const msgRes = await fetch(`${this.config.serverUrl}/session/${session.id}/message`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            parts: [{ type: "text", text: prompt }],
+            model: this.config.model ? { id: this.config.model } : undefined,
+          }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(msgTimeout);
+
+        if (!msgRes.ok) {
+          const text = await msgRes.text();
+          throw new Error(`send message failed: ${msgRes.status} ${text}`);
+        }
+
+        const msg = (await msgRes.json()) as OpenCodeMessageResponse;
+        const textParts = msg.parts?.filter((p) => p.type === "text").map((p) => p.text).join("\n") || "";
+
         return {
-          summary: payload.summary ?? payload.text ?? `task ${task.id} completed by opencode`,
-          output: payload.output ?? payload,
+          summary: textParts.slice(-500) || `Task ${task.id} completed`,
+          output: { sessionId: session.id, parts: msg.parts },
         };
       } catch (error) {
         lastError = error;

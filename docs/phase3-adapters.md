@@ -5,8 +5,9 @@
 | cliType | 说明 | cliConfig |
 |---------|------|-----------|
 | `opencode` | HTTP API 调用 | `serverUrl`, `endpoint`, `model`, `timeoutMs`, `retryCount` |
+| `acp` | OpenCode ACP 子进程 | `model?`, `timeoutMs`, `messagesFilePath?`, `cwd?`（未设则用 repo.path） |
 | `claude-code` | 写入 Claude Code inbox 文件 | `teamName`, `baseDir?` |
-| `stdin` | 子进程执行，prompt 作为最后参数 | `command`, `args?`, `timeoutMs` |
+| `stdin` | 子进程执行 | `command`, `args?`, `timeoutMs`, `cwd?`, `argsOnly?` |
 | 其他 | Noop（立即返回成功） | - |
 
 ### Claude Code 适配器
@@ -17,9 +18,10 @@
 
 ### Stdin 适配器
 
-- 适用于支持 `cmd arg1 arg2 "prompt"` 的 CLI
-- 示例：`opencode run "task subject and description"`
-- 配置：`{ "command": "opencode", "args": ["run"], "timeoutMs": 60000 }`
+- 默认：`args` + task 内容作为最后参数，适用于 `cmd arg1 "prompt"` 的 CLI
+- `argsOnly: true`：仅执行 `command args`，不追加 task，适用于 `pnpm test` 等纯命令
+- `cwd`：工作目录，未设时由 Runner 注入 repo.path
+- 示例：`{ "command": "pnpm", "args": ["test"], "argsOnly": true, "timeoutMs": 120000 }`
 
 ## Web 控制台
 
