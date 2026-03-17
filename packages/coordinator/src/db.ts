@@ -165,6 +165,8 @@ const createTaskStmt = db.prepare(
       status = 'online'
   `);
   const getNodeStatusStmt = db.prepare("SELECT status FROM nodes WHERE id = ?");
+  const listNodesStmt = db.prepare("SELECT id, mesh_id, last_heartbeat_at, status FROM nodes ORDER BY last_heartbeat_at DESC");
+  const listNodesByMeshStmt = db.prepare("SELECT id, mesh_id, last_heartbeat_at, status FROM nodes WHERE mesh_id = ? ORDER BY last_heartbeat_at DESC");
   const markOfflineNodesStmt = db.prepare(`
     UPDATE nodes SET status = 'offline'
     WHERE last_heartbeat_at < ?
@@ -443,6 +445,18 @@ listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] 
   isNodeOnline(nodeId: string): boolean {
     const row = getNodeStatusStmt.get(nodeId) as { status: string } | undefined;
     return row?.status === "online";
+  },
+
+  listNodes(meshId?: string): Array<{ id: string; meshId: string; lastHeartbeatAt: string; status: string }> {
+    const rows = meshId
+      ? listNodesByMeshStmt.all(meshId)
+      : listNodesStmt.all();
+    return (rows as Array<{ id: string; mesh_id: string; last_heartbeat_at: string; status: string }>).map((r) => ({
+      id: r.id,
+      meshId: r.mesh_id,
+      lastHeartbeatAt: r.last_heartbeat_at,
+      status: r.status,
+    }));
   },
 };
 

@@ -30,13 +30,38 @@ export class SlackPlugin implements ChatPlugin {
   }
 
   onTaskUpdate?(event: TaskEvent): void {
-    console.log(`[slack] task ${event.taskId} -> ${event.status}: ${event.subject ?? ""}`);
+    const msg = `[${event.meshId}] 任务 ${event.taskId} -> ${event.status}${event.subject ? `: ${event.subject}` : ""}`;
+    console.log(`[slack] ${msg}`);
+    this.pushToSlack(msg);
   }
 
   onMessage?(event: MessageEvent): void {
     const payload = event.payload as Record<string, unknown>;
     const text = payload?.text ?? payload?.summary ?? payload?.error ?? JSON.stringify(payload);
-    console.log(`[slack] message ${event.from} -> ${event.to} (${event.type}): ${String(text).slice(0, 100)}`);
+    const msg = `[${event.meshId}] ${event.from} -> ${event.to} (${event.type}): ${String(text).slice(0, 200)}`;
+    console.log(`[slack] ${msg}`);
+    this.pushToSlack(msg);
+  }
+
+  private async pushToSlack(text: string): Promise<void> {
+    const cfg = this.config;
+    if (!cfg?.slackToken || !cfg?.slackChannel) return;
+    try {
+      const res = await fetch("https://slack.com/api/chat.postMessage", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${cfg.slackToken}`,
+        },
+        body: JSON.stringify({ channel: cfg.slackChannel, text }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        console.error(`[slack] postMessage failed: ${res.status} ${err}`);
+      }
+    } catch (e) {
+      console.error("[slack] pushToSlack error:", e);
+    }
   }
 
   private subscribeSSE(): void {

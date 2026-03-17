@@ -1,0 +1,23 @@
+# E2E Demo 专用配置（与 phase1-e2e-demo.sh 配合）
+# mesh id 必须为 mesh-example，repo 为 frontend-repo，agent 为 agent-frontend
+# 使用 noop 适配器，无需外部服务
+
+mesh:
+  id: mesh-example
+  name: Demo Mesh
+
+repos:
+  - id: frontend-repo
+    path: /tmp/agent-mesh-demo
+    agent:
+      id: agent-frontend
+      name: Frontend Agent
+      cliType: noop
+
+coordinator:
+  url: ${MESH_COORDINATOR_URL}
+  apiKey: ""
+
+node:
+  id: node-demo
+  pollIntervalMs: 2000

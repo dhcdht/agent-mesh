@@ -35,13 +35,14 @@
 - Coordinator 在任务/消息变更时 POST 到 Webhook
 - 需管理 Webhook 注册表
 
-### Step 2：插件接口 ✅ Slack 已实现 SSE 订阅
+### Step 2：插件接口 ✅ Slack 已实现 SSE 订阅与推送
 
 Slack 插件已实现：
 - 订阅 `GET /api/v1/events?meshId=xxx`
 - 解析 `task.created`、`task.updated`、`message.created`
-- 回调 `onTaskUpdate`、`onMessage`（当前控制台输出）
-- 运行：`MESH_ID=xxx pnpm plugin:slack`
+- 回调 `onTaskUpdate`、`onMessage`，并调用 `chat.postMessage` 推送到 Slack 频道
+- 配置 `SLACK_TOKEN`、`SLACK_CHANNEL` 后自动推送；未配置时仅控制台输出
+- 运行：`MESH_ID=xxx SLACK_TOKEN=xoxb-xxx SLACK_CHANNEL=C01234567 pnpm plugin:slack`
 
 见 `apps/plugins/slack/types.ts` 中 `ChatPlugin`：
 

@@ -76,6 +76,7 @@ pnpm --filter @agent-mesh/coordinator test
   - `GET /api/v1/agents?meshId=<id>&nodeId=<optional>`（返回 `nodeOnline`）
 - Node
   - `POST /api/v1/nodes/:nodeId/heartbeat`（body: `{ meshId }`）
+  - `GET /api/v1/nodes?meshId=<optional>` — 列出节点及状态（扩缩容）
 - Task
   - `POST /api/v1/tasks`
   - `PATCH /api/v1/tasks/:taskId`

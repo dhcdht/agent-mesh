@@ -250,4 +250,41 @@ describe("coordinator api", () => {
 
     await app.close();
   });
+
+  it("lists nodes with optional meshId filter", async () => {
+    const app = await createApp();
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/meshes",
+      payload: { id: "mesh-nodes", name: "nodes test" },
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/nodes/node-a/heartbeat",
+      payload: { meshId: "mesh-nodes" },
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/meshes",
+      payload: { id: "mesh-other", name: "other" },
+    });
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/nodes/node-b/heartbeat",
+      payload: { meshId: "mesh-other" },
+    });
+
+    const all = await app.inject({ method: "GET", url: "/api/v1/nodes" });
+    expect(all.statusCode).toBe(200);
+    const allData = all.json() as { items: Array<{ id: string; meshId: string }> };
+    expect(allData.items.length).toBeGreaterThanOrEqual(2);
+
+    const filtered = await app.inject({ method: "GET", url: "/api/v1/nodes?meshId=mesh-nodes" });
+    expect(filtered.statusCode).toBe(200);
+    const filteredData = filtered.json() as { items: Array<{ id: string; meshId: string }> };
+    expect(filteredData.items.every((n) => n.meshId === "mesh-nodes")).toBe(true);
+
+    await app.close();
+  });
 });

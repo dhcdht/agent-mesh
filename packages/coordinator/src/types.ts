@@ -84,4 +84,5 @@ export interface CoordinatorStorage {
   recordHeartbeat(nodeId: string, meshId: string): void;
   markOfflineNodes(thresholdMs: number): void;
   isNodeOnline(nodeId: string): boolean;
+  listNodes(meshId?: string): Array<{ id: string; meshId: string; lastHeartbeatAt: string; status: string }>;
 }

@@ -13,6 +13,8 @@ import { SlackPlugin } from "./index.js";
 const meshId = process.env.MESH_ID;
 const coordinatorUrl = process.env.MESH_COORDINATOR_URL ?? process.env.COORDINATOR_URL ?? "http://localhost:3000";
 const apiKey = process.env.MESH_API_KEY;
+const slackToken = process.env.SLACK_TOKEN;
+const slackChannel = process.env.SLACK_CHANNEL;
 
 if (!meshId) {
   console.error("MESH_ID is required");
@@ -25,6 +27,8 @@ plugin
     coordinatorUrl,
     meshId,
     apiKey,
+    slackToken,
+    slackChannel,
   })
   .then(() => {
     console.log("[slack] listening for events...");

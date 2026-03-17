@@ -41,7 +41,7 @@ Agent Mesh 是一个**分布式多 AI Agent 协作系统**，专注于解决多�
 | **标准消息类型** | request / question / answer / done / failed / broadcast / message |
 | **deliverMessage** | Adapter 可选实现，Runner 将 inbox 消息投递给 CLI（Claude Code 写文件、ACP 注入下次 prompt） |
 
-### 5. CLI 命令（共 14 个）
+### 5. CLI 命令（共 15 个）
 ```
 Chat 交互：
   chat --mesh-id <meshId>     # 与 agents 交流，查看讨论与进展
@@ -55,8 +55,9 @@ Repo 管理：
   repo:add --id <id> --mesh-id <meshId> --path <path> --agent-id <agentId>
   repo:list --mesh-id <meshId>
 
-Agent 管理：
-  agent:list --mesh-id <meshId>
+Agent / Node 管理：
+  agent:list --mesh-id <meshId> [--node-id <nodeId>]
+  node:list [--mesh-id <meshId>]   # 列出节点（扩缩容）
 
 任务管理：
   task:create --id <id> --mesh-id <meshId> --subject <subject> --description <desc> --owner <owner> --repo-id <repoId>
@@ -87,8 +88,8 @@ docker-compose up -d --scale node=5
 - **Agents 列表**：展示 `nodeOnline`（🟢 在线 / 🔴 离线）
 
 ### 8. 测试通过
-- 单元测试全部通过（含 broadcast、task:messages）
-- E2E 演示脚本可用
+- 单元测试全部通过（含 broadcast、task:messages、nodes 列表）
+- E2E 演示脚本可用（`pnpm demo`，使用 config/mesh.demo.yaml + noop 适配器）
 
 ### 9. 自举（Self-Host）
 - **config/mesh.selfhost.yaml**：3 agent（tester、plugin、research）协作
@@ -186,12 +187,9 @@ docker-compose up -d --scale node=5
 
 
 #### 扩缩容 API
-当前只能通过 docker-compose 手动扩容，无法动态管理。
-
-**TODO**：
-- `POST /api/v1/nodes/scale?replicas=5`
-- `GET /api/v1/nodes` 列出所有节点及状态
-- `DELETE /api/v1/nodes/:nodeId` 下线节点
+- ✅ `GET /api/v1/nodes?meshId=<optional>` 列出节点及状态
+- ✅ CLI `node:list [--mesh-id <meshId>]`
+- **TODO**：`POST /api/v1/nodes/scale?replicas=5`、`DELETE /api/v1/nodes/:nodeId` 下线节点
 
 ### 5.2 中优先级
 
@@ -220,13 +218,13 @@ docker-compose up -d --scale node=5
 
 **当前**：
 - ✅ Coordinator SSE：`GET /api/v1/events?meshId=xxx` 推送 `task.created`、`task.updated`、`message.created`
-- ✅ Slack 插件：订阅 SSE、接收事件并回调 `onTaskUpdate`/`onMessage`（控制台输出）
-- 运行：`MESH_ID=xxx pnpm plugin:slack`
+- ✅ Slack 插件：订阅 SSE、接收事件并回调 `onTaskUpdate`/`onMessage`
+- ✅ Slack 推送：配置 `SLACK_TOKEN`、`SLACK_CHANNEL` 后通过 `chat.postMessage` 推送到 Slack 频道
+- 运行：`MESH_ID=xxx SLACK_TOKEN=xoxb-xxx SLACK_CHANNEL=C01234567 pnpm plugin:slack`
 
 **TODO**：
-1. Slack 推送：配置 SLACK_TOKEN、SLACK_CHANNEL 后推送到 Slack 频道
-2. 用户回复回调：Slack Event Subscriptions → Coordinator
-3. 飞书、Discord 插件（复用接口）
+1. 用户回复回调：Slack Event Subscriptions → Coordinator
+2. 飞书、Discord 插件（复用接口）
 
 详见 [AGENTS.md](../AGENTS.md) 六、聊天工具接入计划。
 

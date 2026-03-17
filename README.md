@@ -82,11 +82,11 @@ pnpm install
 # 构建
 pnpm build
 
-# 运行 E2E 演示（自动启动 Coordinator + Mock OpenCode + Node，约 15 秒）
+# 运行 E2E 演示（自动启动 Coordinator + Node，约 35 秒）
 pnpm demo
 ```
 
-演示会创建 mesh、下发任务、Node 执行后向 lead 收件箱发送完成消息。
+演示使用 `config/mesh.demo.yaml`（noop 适配器），创建 mesh、下发任务、Node 执行后向 lead 收件箱发送完成消息。
 
 ## 手动启动
 
@@ -137,6 +137,9 @@ pnpm cli task:list --mesh-id my-mesh
 
 # 查看 lead 收件箱
 pnpm cli inbox:list --mesh-id my-mesh --agent-id lead
+
+# 列出节点（扩缩容）
+pnpm cli node:list [--mesh-id my-mesh]
 
 # Chat 交互模式：与 agents 交流，查看 agent 间讨论
 pnpm cli chat --mesh-id my-mesh

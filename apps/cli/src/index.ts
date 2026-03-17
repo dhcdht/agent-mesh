@@ -100,6 +100,18 @@ program
   });
 
 program
+  .command("node:list")
+  .description("List nodes (optionally filter by mesh)")
+  .option("--mesh-id <meshId>", "Filter by mesh id")
+  .action(async (cmdOptions) => {
+    const global = program.opts<{ coordinator: string; apiKey?: string }>();
+    const client = withClient(global);
+    const query = cmdOptions.meshId ? `?meshId=${encodeURIComponent(cmdOptions.meshId)}` : "";
+    const result = await client.request("GET", `/api/v1/nodes${query}`);
+    console.log(JSON.stringify(result, null, 2));
+  });
+
+program
   .command("task:create")
   .requiredOption("--id <id>", "Task id")
   .requiredOption("--mesh-id <meshId>", "Mesh id")
