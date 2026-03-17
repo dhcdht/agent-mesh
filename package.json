@@ -14,7 +14,9 @@
     "node:selfhost": "pnpm --filter @agent-mesh/node start ../../config/mesh.selfhost.yaml",
     "cli": "pnpm --filter @agent-mesh/cli start --",
     "demo": "./scripts/phase1-e2e-demo.sh",
-    "plugin:slack": "pnpm --filter @agent-mesh/plugins slack"
+    "plugin:slack": "pnpm --filter @agent-mesh/plugins slack",
+    "plugin:feishu": "pnpm --filter @agent-mesh/plugins feishu",
+    "plugin:discord": "pnpm --filter @agent-mesh/plugins discord"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

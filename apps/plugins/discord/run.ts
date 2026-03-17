@@ -1,44 +1,44 @@
 #!/usr/bin/env node
 /**
- * 运行 Slack 插件：订阅 Coordinator SSE，接收任务/消息事件
+ * 运行 Discord 插件：订阅 Coordinator SSE，接收任务/消息事件
  *
  * 环境变量：
  *   MESH_ID          mesh ID（必填）
  *   COORDINATOR_URL  Coordinator 地址，默认 http://localhost:3000
  *   MESH_API_KEY     可选 API Key
+ *
+ * Discord 推送（可选）：
+ *   DISCORD_BOT_TOKEN    Discord Bot Token
+ *   DISCORD_CHANNEL_ID   频道 ID（channel_id）
  */
 
-import { SlackPlugin } from "./index.js";
+import { DiscordPlugin } from "./index.js";
 
 const meshId = process.env.MESH_ID;
 const coordinatorUrl = process.env.MESH_COORDINATOR_URL ?? process.env.COORDINATOR_URL ?? "http://localhost:3000";
 const apiKey = process.env.MESH_API_KEY;
-const slackToken = process.env.SLACK_TOKEN;
-const slackChannel = process.env.SLACK_CHANNEL;
-const slackSigningSecret = process.env.SLACK_SIGNING_SECRET;
-const slackEventsPort = process.env.SLACK_EVENTS_PORT ? parseInt(process.env.SLACK_EVENTS_PORT, 10) : undefined;
+const botToken = process.env.DISCORD_BOT_TOKEN;
+const channelId = process.env.DISCORD_CHANNEL_ID;
 
 if (!meshId) {
   console.error("MESH_ID is required");
   process.exit(1);
 }
 
-const plugin = new SlackPlugin();
+const plugin = new DiscordPlugin();
 plugin
   .start({
     coordinatorUrl,
     meshId,
     apiKey,
-    slackToken,
-    slackChannel,
-    slackSigningSecret,
-    slackEventsPort: Number.isFinite(slackEventsPort) ? slackEventsPort : undefined,
+    botToken,
+    channelId,
   })
   .then(() => {
-    console.log("[slack] listening for events...");
+    console.log("[discord] listening for events...");
   })
   .catch((e) => {
-    console.error("[slack] start failed:", e);
+    console.error("[discord] start failed:", e);
     process.exit(1);
   });
 

@@ -55,19 +55,28 @@ interface ChatPlugin {
 }
 ```
 
-扩展：支持 `onUserReply(channelId, userId, text)` 回调，将用户消息转发到 Coordinator。
+✅ 用户回复：插件 HTTP 服务接收 Slack Events，解析后转发到 Coordinator。
 
-### Step 3：Slack 推送与回调
+### Step 3：Slack 推送与回调 ✅ 已实现
 
 1. **Slack App**：创建 App、配置 Bot Token、Event Subscriptions
-2. **入站**：接收 `message` 事件，解析 @mention、命令
-3. **出站**：`chat.postMessage` 推送任务/消息到频道
-4. **回调**：用户回复 → 解析 → `POST /api/v1/messages` 到 Coordinator
+2. **入站**：配置 `SLACK_SIGNING_SECRET`、`SLACK_EVENTS_PORT`，插件启动 HTTP 服务；Slack Event Subscriptions Request URL 设为 `https://<公网>/slack/events`
+3. **出站**：`chat.postMessage` 推送任务/消息到频道（SLACK_TOKEN、SLACK_CHANNEL）
+4. **回调**：用户消息 → 插件解析 `@agent 消息` / `* 消息` → `POST /api/v1/messages` 到 Coordinator
+
+运行示例（含用户回复）：
+```bash
+MESH_ID=xxx SLACK_TOKEN=xoxb-xxx SLACK_CHANNEL=C01234567 \
+SLACK_SIGNING_SECRET=xxx SLACK_EVENTS_PORT=4097 \
+pnpm plugin:slack
+```
+需将 `https://<ngrok或公网>:4097/slack/events` 配置为 Slack App 的 Event Subscriptions Request URL。
 
 ### Step 4：飞书、Discord
 
 - 复用 `ChatPlugin` 接口
-- 各平台 API 不同，分别实现 `apps/plugins/feishu/`、`apps/plugins/discord/`
+- **飞书**：已实现 `apps/plugins/feishu/`，SSE 订阅、消息推送、用户回复（需 FEISHU_APP_ID、FEISHU_APP_SECRET、FEISHU_CHAT_ID、FEISHU_VERIFICATION_TOKEN、FEISHU_EVENTS_PORT）
+- **Discord**：已实现 `apps/plugins/discord/`，SSE 订阅、消息推送（DISCORD_BOT_TOKEN、DISCORD_CHANNEL_ID）。用户回复需 Gateway 或 Interactions，暂未实现
 
 ## 四、配置示例
 
@@ -86,6 +95,27 @@ plugins:
       chatId: oc_xxx
       meshId: agent-mesh-dev
 ```
+
+### 飞书插件运行
+
+```bash
+MESH_ID=xxx COORDINATOR_URL=http://localhost:3000 \
+FEISHU_APP_ID=xxx FEISHU_APP_SECRET=xxx FEISHU_CHAT_ID=oc_xxx \
+FEISHU_VERIFICATION_TOKEN=xxx FEISHU_EVENTS_PORT=4098 \
+pnpm plugin:feishu
+```
+
+飞书配置：创建自建应用 → 开启机器人 → 权限：im:message、im:message:send_as_bot → 事件订阅「接收消息 v2.0」→ 请求 URL 配置为 `https://<公网>:4098/feishu/events`
+
+### Discord 插件运行
+
+```bash
+MESH_ID=xxx COORDINATOR_URL=http://localhost:3000 \
+DISCORD_BOT_TOKEN=xxx DISCORD_CHANNEL_ID=123456789 \
+pnpm plugin:discord
+```
+
+Discord 配置：创建应用 → 添加 Bot → 邀请到服务器 → 获取 Bot Token、频道 ID（开发者模式开启后右键频道复制）
 
 ## 五、消息格式（推送到群聊）
 

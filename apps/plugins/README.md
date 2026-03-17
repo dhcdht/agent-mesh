@@ -9,16 +9,19 @@ Phase 5 预留：插件框架，统一消息出口（任务进展、agent 讨论
 ## 已实现
 
 - **slack/** — Slack 插件
-  - 订阅 Coordinator SSE（`GET /api/v1/events?meshId=xxx`）
-  - 接收 `task.created`、`task.updated`、`message.created` 事件
-  - `onTaskUpdate`/`onMessage` 回调（当前输出到控制台）
+  - 订阅 Coordinator SSE，推送任务/消息到 Slack 频道
+  - 用户回复：SLACK_SIGNING_SECRET、SLACK_EVENTS_PORT
   - 运行：`MESH_ID=xxx pnpm plugin:slack`
 
-## 计划支持
+- **feishu/** — 飞书插件
+  - 订阅 Coordinator SSE，推送任务/消息到飞书群
+  - 用户回复：FEISHU_VERIFICATION_TOKEN、FEISHU_EVENTS_PORT
+  - 运行：`MESH_ID=xxx pnpm plugin:feishu`
 
-- Slack（骨架已有）
-- 飞书
-- Discord
+- **discord/** — Discord 插件
+  - 订阅 Coordinator SSE，推送任务/消息到 Discord 频道
+  - 用户回复：需 Gateway 或 Interactions，暂未实现
+  - 运行：`MESH_ID=xxx pnpm plugin:discord`
 
 ## 使用方式
 

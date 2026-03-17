@@ -125,17 +125,21 @@ docs/
 ### 5.1 高优先级
 
 - ~~**心跳机制**~~ ✅ 已实现
-- **扩缩容 API**：动态管理 Node 实例
+- ~~**扩缩容 API**~~ ✅ GET/DELETE nodes、node:list、node:delete
+- ~~**认证与授权**~~ ✅ API Key（MESH_API_KEY）
+- ~~**Web Dashboard**~~ ✅ Mesh/Agents/Nodes/任务/收件箱、API Key 支持
 
 ### 5.2 中优先级
 
-- **聊天工具接入**：Slack、飞书、Discord 等（见下节）
-- **Web Dashboard**：任务看板、Agent 在线状态
+- ~~**聊天工具接入（Slack）**~~ ✅ SSE 订阅、Slack 推送、用户回复回调（SLACK_SIGNING_SECRET、SLACK_EVENTS_PORT）
+- ~~**飞书插件**~~ ✅ 已实现（FEISHU_APP_ID、FEISHU_APP_SECRET、FEISHU_CHAT_ID、FEISHU_VERIFICATION_TOKEN、FEISHU_EVENTS_PORT）
+- ~~**Discord 插件**~~ ✅ 已实现（DISCORD_BOT_TOKEN、DISCORD_CHANNEL_ID，推送仅）
 
 ### 5.3 低优先级
 
-- **认证与授权**：API Key、JWT
-- **性能优化**：批量拉取、数据库索引
+- **TODO**：角色权限控制
+- **TODO**：批量任务拉取
+- ~~**数据库索引**~~ ✅ 已添加
 
 ## 六、聊天工具接入计划
 
@@ -160,9 +164,10 @@ Coordinator (SSE/Webhook)  →  插件  →  聊天平台
 
 ### 6.4 当前状态
 
-- `apps/plugins/slack/` 骨架已存在
-- ✅ Coordinator SSE 已实现（`GET /api/v1/events?meshId=xxx`）
-- 需实现：插件订阅 SSE、推送消息到 Slack、接收用户回复回调
+- ✅ Coordinator SSE：`GET /api/v1/events?meshId=xxx`
+- ✅ Slack 插件：SSE 订阅、Slack 推送（SLACK_TOKEN、SLACK_CHANNEL）、用户回复（SLACK_SIGNING_SECRET、SLACK_EVENTS_PORT）
+- ✅ 飞书插件：SSE 订阅、飞书推送、用户回复（FEISHU_VERIFICATION_TOKEN、FEISHU_EVENTS_PORT）
+- ✅ Discord 插件：SSE 订阅、Discord 推送（DISCORD_BOT_TOKEN、DISCORD_CHANNEL_ID）
 
 ## 七、参考
 

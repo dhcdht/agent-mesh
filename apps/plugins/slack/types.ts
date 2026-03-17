@@ -9,6 +9,10 @@ export interface PluginConfig {
   apiKey?: string;
   slackToken?: string;
   slackChannel?: string;
+  /** 接收用户回复：Slack Signing Secret，用于验证请求 */
+  slackSigningSecret?: string;
+  /** 接收用户回复：HTTP 端口，需公网可访问并配置为 Slack Event Subscriptions Request URL */
+  slackEventsPort?: number;
 }
 
 export interface TaskEvent {

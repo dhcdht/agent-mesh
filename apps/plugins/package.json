@@ -5,7 +5,9 @@
   "type": "module",
   "description": "Chat platform plugins for Agent Mesh (Phase 5)",
   "scripts": {
-    "slack": "tsx slack/run.ts"
+    "slack": "tsx slack/run.ts",
+    "feishu": "tsx feishu/run.ts",
+    "discord": "tsx discord/run.ts"
   },
   "devDependencies": {
     "tsx": "^4.19.2"

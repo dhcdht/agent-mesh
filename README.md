@@ -228,7 +228,7 @@ pnpm coordinator
 - [Node 演示](docs/phase1-node-demo.md)
 - [Phase 3 适配器](docs/phase3-adapters.md)
 - [Phase 4 可观测性](docs/phase4-observability.md)
-- [聊天工具接入计划](docs/chat-plugin-integration.md) — Slack 插件已支持 SSE 订阅
+- [聊天工具接入计划](docs/chat-plugin-integration.md) — Slack、飞书、Discord 插件已支持 SSE 订阅
 
 ## License
 

@@ -90,11 +90,16 @@ docker-compose up -d --scale node=5
 - **Nodes 列表**：节点状态、最后心跳、下线按钮
 - **API Key 支持**：启用认证时可输入 Key 访问
 
-### 8. 测试通过
+### 8. 聊天插件
+- **Slack**：SSE 订阅、推送、用户回复（SLACK_SIGNING_SECRET、SLACK_EVENTS_PORT）
+- **飞书**：SSE 订阅、推送、用户回复（FEISHU_APP_ID、FEISHU_APP_SECRET、FEISHU_CHAT_ID、FEISHU_VERIFICATION_TOKEN、FEISHU_EVENTS_PORT）
+- **Discord**：SSE 订阅、推送（DISCORD_BOT_TOKEN、DISCORD_CHANNEL_ID）。用户回复需 Gateway/Interactions，暂未实现
+
+### 9. 测试通过
 - 单元测试全部通过（含 broadcast、task:messages、nodes 列表）
 - E2E 演示脚本可用（`pnpm demo`，使用 config/mesh.demo.yaml + noop 适配器）
 
-### 9. 自举（Self-Host）
+### 10. 自举（Self-Host）
 - **config/mesh.selfhost.yaml**：3 agent（tester、plugin、research）协作
 - **scripts/bootstrap-selfhost.sh**：引导脚本
 - **pnpm node:selfhost**：启动自举 Node
@@ -208,12 +213,10 @@ docker-compose up -d --scale node=5
 - 测试 Claude Code inbox 文件写入
 - 验证 Agent 是否会自动读取并执行
 
-#### Web Dashboard
-当前只有 API，缺少可视化界面。
-
-**TODO**：
-- 添加简单的 Web UI
-- 查看 Mesh 列表、任务状态、Agent 在线情况
+#### Web Dashboard ✅ 已实现
+- Mesh 选择、Agents 列表（nodeOnline）、Nodes 列表（下线按钮）
+- 任务列表、收件箱、人工标记完成
+- API Key 输入（启用认证时）
 
 ### 5.3 中高优先级（已提上日程）
 
@@ -226,9 +229,8 @@ docker-compose up -d --scale node=5
 - ✅ Slack 推送：配置 `SLACK_TOKEN`、`SLACK_CHANNEL` 后通过 `chat.postMessage` 推送到 Slack 频道
 - 运行：`MESH_ID=xxx SLACK_TOKEN=xoxb-xxx SLACK_CHANNEL=C01234567 pnpm plugin:slack`
 
-**TODO**：
-1. 用户回复回调：Slack Event Subscriptions → Coordinator
-2. 飞书、Discord 插件（复用接口）
+- ✅ **用户回复回调**：配置 `SLACK_SIGNING_SECRET`、`SLACK_EVENTS_PORT` 后，插件启动 HTTP 服务接收 Slack Events；用户消息转发到 Coordinator（`@agent 消息` 点对点，`* 消息` 或普通消息广播）
+- **TODO**：飞书、Discord 插件（复用接口）
 
 详见 [AGENTS.md](../AGENTS.md) 六、聊天工具接入计划。
 
@@ -238,8 +240,8 @@ docker-compose up -d --scale node=5
 - **TODO**：角色权限控制
 
 #### 性能优化
-- 批量任务拉取
-- 数据库索引优化
+- **TODO**：批量任务拉取
+- ✅ 数据库索引：tasks(mesh_id,status)、tasks(mesh_id,owner)、messages(mesh_id,recipient)、messages(mesh_id,task_id)、nodes(mesh_id)、agents(mesh_id)
 
 ## 六、快速开始
 
@@ -292,7 +294,7 @@ pnpm cli task:create --id task-1 --mesh-id test-mesh \
 
 ---
 
-## 八、自举开发记录（2026-03-17）
+## 八、自举开发记录（2025-03-16）
 
 ### 本轮自举任务与结果
 
@@ -310,4 +312,4 @@ pnpm cli task:create --id task-1 --mesh-id test-mesh \
 
 ---
 
-*文档更新日期：2026-03-17*
+*文档更新日期：2025-03-16*

@@ -88,6 +88,13 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       status TEXT NOT NULL DEFAULT 'online',
       FOREIGN KEY(mesh_id) REFERENCES meshes(id)
     );
+
+    CREATE INDEX IF NOT EXISTS idx_tasks_mesh_status ON tasks(mesh_id, status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_mesh_owner ON tasks(mesh_id, owner);
+    CREATE INDEX IF NOT EXISTS idx_messages_mesh_recipient ON messages(mesh_id, recipient);
+    CREATE INDEX IF NOT EXISTS idx_messages_mesh_task ON messages(mesh_id, task_id);
+    CREATE INDEX IF NOT EXISTS idx_nodes_mesh ON nodes(mesh_id);
+    CREATE INDEX IF NOT EXISTS idx_agents_mesh ON agents(mesh_id);
   `);
 
   // Migration: add task_id if table existed without it
