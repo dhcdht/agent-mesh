@@ -15,7 +15,11 @@ Agent Mesh 是一个**分布式多 AI Agent 协作系统**，专注于解决多�
 - **Agent Node**：轮询任务执行，支持多适配器
 - **消息系统**：基于邮箱的异步消息，支持已读回执、**Agent 间通信**、**群组广播**、**按任务聚合会话**（借鉴 [Stream0](https://github.com/risingwavelabs/stream0)）
 
-### 2. 适配器实现
+### 2. 心跳与事件
+- **心跳机制**：Node 定期上报，Coordinator `nodes` 表，`GET /agents` 返回 `nodeOnline`
+- **SSE 事件**：`GET /api/v1/events?meshId=xxx` 推送任务/消息变更，供聊天插件订阅
+
+### 3. 适配器实现
 | 适配器 | 类型 | 说明 |
 |--------|------|------|
 | `noop` | 模拟 | 仅打印日志，用于测试 |
@@ -25,7 +29,7 @@ Agent Mesh 是一个**分布式多 AI Agent 协作系统**，专注于解决多�
 | `opencode-cli` | 子进程 | opencode run 命令 |
 | `stdin` | 子进程 | 通过 stdin 传递 prompt，命令作为参数 |
 
-### 3. Agent 间与群组通信（核心能力）
+### 4. Agent 间与群组通信（核心能力）
 
 借鉴 [Stream0](https://github.com/risingwavelabs/stream0) 设计，实现：
 
@@ -37,7 +41,7 @@ Agent Mesh 是一个**分布式多 AI Agent 协作系统**，专注于解决多�
 | **标准消息类型** | request / question / answer / done / failed / broadcast / message |
 | **deliverMessage** | Adapter 可选实现，Runner 将 inbox 消息投递给 CLI（Claude Code 写文件、ACP 注入下次 prompt） |
 
-### 4. CLI 命令（共 14 个）
+### 5. CLI 命令（共 14 个）
 ```
 Chat 交互：
   chat --mesh-id <meshId>     # 与 agents 交流，查看讨论与进展
@@ -65,7 +69,7 @@ Agent 管理：
   inbox:list --mesh-id <meshId> --agent-id <agentId> [--unread-only]
 ```
 
-### 5. Docker 部署
+### 6. Docker 部署
 ```bash
 # 构建镜像
 docker build -t agent-mesh/coordinator .
@@ -78,11 +82,11 @@ docker-compose up -d
 docker-compose up -d --scale node=5
 ```
 
-### 6. 测试通过
+### 7. 测试通过
 - 单元测试全部通过（含 broadcast、task:messages）
 - E2E 演示脚本可用
 
-### 7. 自举（Self-Host）
+### 8. 自举（Self-Host）
 - **config/mesh.selfhost.yaml**：3 agent（tester、plugin、research）协作
 - **scripts/bootstrap-selfhost.sh**：引导脚本
 - **pnpm node:selfhost**：启动自举 Node
@@ -171,34 +175,10 @@ docker-compose up -d --scale node=5
 
 ### 5.1 高优先级
 
-#### 心跳机制
-当前 Node 没有定期向 Coordinator 发送心跳，无法检测节点存活。
-
-**TODO**：
-- Node 每 30 秒发送心跳到 `/api/v1/nodes/:nodeId/heartbeat`
-- Coordinator 记录最后心跳时间
-- 超过 2 分钟未心跳则标记为离线
-
-**实现要点**：
-1. **Node 端**：在 `packages/node/src/runner.ts` 主循环的 `sleep(config.node.pollIntervalMs)` 之前，顺带调用 `client.heartbeat(nodeId)`。可用 `Promise.all` 与任务拉取并行执行以减少延迟。
-
-2. **Coordinator 端**：
-   - `packages/coordinator/src/db.ts`：新增 `nodes` 表
-     ```sql
-     CREATE TABLE IF NOT EXISTS nodes (
-       id TEXT PRIMARY KEY,
-       mesh_id TEXT NOT NULL,
-       last_heartbeat_at TEXT NOT NULL,
-       status TEXT NOT NULL DEFAULT 'online',
-       FOREIGN KEY(mesh_id) REFERENCES meshes(id)
-     );
-     ```
-   - 新增 `packages/coordinator/src/routes/nodes.ts`：
-     - `POST /nodes/:nodeId/heartbeat`：接收心跳，更新 `last_heartbeat_at` 为当前时间，`status` 设为 `online`
-     - 后台定时任务：扫描所有节点，`last_heartbeat_at` 超过 2 分钟则将 `status` 设为 `offline`
-   - `packages/coordinator/src/routes/agents.ts`：`GET /agents` 返回的 agent 对象增加 `nodeOnline: boolean` 字段（通过关联 nodes 表查询 `status = 'online'` 判断）
-
-3. **CoordinatorClient**：新增 `heartbeat(nodeId: string)` 方法，`POST /api/v1/nodes/{nodeId}/heartbeat`
+#### 心跳机制 ✅ 已实现
+- Node 每轮询周期发送心跳到 `POST /api/v1/nodes/:nodeId/heartbeat`（body: `{ meshId }`）
+- Coordinator `nodes` 表记录 `last_heartbeat_at`，后台每 30 秒扫描，超过 2 分钟未心跳则 `status=offline`
+- `GET /agents` 返回 `nodeOnline: boolean`（有 nodeId 的 agent 根据 nodes 表判断）
 
 
 #### 扩缩容 API
@@ -234,13 +214,13 @@ docker-compose up -d --scale node=5
 #### Phase 5：聊天工具接入
 **目标**：用户可在 Slack/飞书/Discord 群聊中查看任务进展、@agent、广播消息。
 
-**当前**：`apps/plugins/slack/` 骨架已有，`ChatPlugin` 接口已定义。
+**当前**：
+- ✅ Coordinator SSE：`GET /api/v1/events?meshId=xxx` 推送 `task.created`、`task.updated`、`message.created`
+- `apps/plugins/slack/` 骨架已有，`ChatPlugin` 接口已定义
 
 **TODO**：
-1. Coordinator 新增 SSE 或 Webhook 推送任务/消息变更
-2. 实现 Slack 插件：连接 Coordinator、推送消息到 Slack、接收用户回复回调
-3. 飞书、Discord 插件（复用接口）
-4. 文档：`docs/chat-plugin-integration.md`
+1. 实现 Slack 插件：订阅 SSE、推送消息到 Slack、接收用户回复回调
+2. 飞书、Discord 插件（复用接口）
 
 详见 [AGENTS.md](../AGENTS.md) 六、聊天工具接入计划。
 

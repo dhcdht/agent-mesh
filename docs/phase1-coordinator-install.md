@@ -73,7 +73,9 @@ pnpm --filter @agent-mesh/coordinator test
   - `GET /api/v1/meshes/:meshId/repos`
 - Agent
   - `POST /api/v1/agents/register`
-  - `GET /api/v1/agents?meshId=<id>&nodeId=<optional>`
+  - `GET /api/v1/agents?meshId=<id>&nodeId=<optional>`（返回 `nodeOnline`）
+- Node
+  - `POST /api/v1/nodes/:nodeId/heartbeat`（body: `{ meshId }`）
 - Task
   - `POST /api/v1/tasks`
   - `PATCH /api/v1/tasks/:taskId`
@@ -82,6 +84,8 @@ pnpm --filter @agent-mesh/coordinator test
   - `POST /api/v1/messages`
   - `GET /api/v1/messages/:agentId/inbox?meshId=<id>&unreadOnly=true|false`
   - `POST /api/v1/messages/:messageId/read`
+- Events（SSE）
+  - `GET /api/v1/events?meshId=<id>` — 推送 `task.created`、`task.updated`、`message.created`
 
 ## 8. 快速验证示例
 

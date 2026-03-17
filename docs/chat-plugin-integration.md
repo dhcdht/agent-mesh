@@ -22,15 +22,14 @@
 
 ## 三、实现步骤
 
-### Step 1：Coordinator 事件推送
+### Step 1：Coordinator 事件推送 ✅ 已实现
 
-**方案 A：SSE（推荐）**
+**SSE**：`GET /api/v1/events?meshId=xxx` 已实现
 
-- 新增 `GET /api/v1/events?meshId=xxx` SSE 端点
 - 推送事件类型：`task.created`、`task.updated`、`message.created`
 - 插件订阅后转发到聊天平台
 
-**方案 B：Webhook**
+**方案 B：Webhook**（可选）
 
 - 插件配置 Webhook URL 到 Coordinator
 - Coordinator 在任务/消息变更时 POST 到 Webhook
@@ -92,7 +91,7 @@ plugins:
 
 ## 六、依赖
 
-- Coordinator 需支持 SSE 或 Webhook（当前未实现）
+- ✅ Coordinator SSE 已实现
 - 各平台需申请 App/Bot 凭证
 - 插件可独立进程运行，或集成到 Coordinator
 

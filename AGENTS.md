@@ -124,7 +124,7 @@ docs/
 
 ### 5.1 高优先级
 
-- **心跳机制**：Node 定期上报，Coordinator 记录 nodes 表
+- ~~**心跳机制**~~ ✅ 已实现
 - **扩缩容 API**：动态管理 Node 实例
 
 ### 5.2 中优先级
@@ -161,7 +161,8 @@ Coordinator (SSE/Webhook)  →  插件  →  聊天平台
 ### 6.4 当前状态
 
 - `apps/plugins/slack/` 骨架已存在
-- 需实现：Coordinator 事件推送、插件与平台连接逻辑
+- ✅ Coordinator SSE 已实现（`GET /api/v1/events?meshId=xxx`）
+- 需实现：插件订阅 SSE、推送消息到 Slack、接收用户回复回调
 
 ## 七、参考
 
