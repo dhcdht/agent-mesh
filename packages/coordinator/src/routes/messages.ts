@@ -37,6 +37,7 @@ export async function registerMessageRoutes(app: FastifyInstance): Promise<void>
             type: parsed.data.type === "message" ? "broadcast" : parsed.data.type,
           } as CreateMessageInput);
           created.push({ id: m.id, to: m.to });
+          app.eventBus.emit({ type: "message.created", meshId: parsed.data.meshId, message: m });
         } catch {
           // 已存在则跳过
         }
@@ -46,6 +47,7 @@ export async function registerMessageRoutes(app: FastifyInstance): Promise<void>
 
     try {
       const message = app.storage.createMessage(parsed.data as CreateMessageInput);
+      app.eventBus.emit({ type: "message.created", meshId: message.meshId, message });
       return reply.code(201).send(message);
     } catch {
       return reply.code(409).send({ error: "message already exists" });

@@ -80,4 +80,8 @@ export interface CoordinatorStorage {
   markMessageRead(messageId: string): Message | undefined;
 
   getMetrics(): { meshes: number; tasks: Record<string, number>; agents: number; messages: number };
+
+  recordHeartbeat(nodeId: string, meshId: string): void;
+  markOfflineNodes(thresholdMs: number): void;
+  isNodeOnline(nodeId: string): boolean;
 }

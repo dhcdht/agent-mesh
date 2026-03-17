@@ -201,4 +201,53 @@ describe("coordinator api", () => {
 
     await app.close();
   });
+
+  it("supports heartbeat and nodeOnline in agents", async () => {
+    const app = await createApp();
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/meshes",
+      payload: { id: "mesh-hb", name: "heartbeat test" },
+    });
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/agents/register",
+      payload: {
+        id: "agent-hb",
+        meshId: "mesh-hb",
+        name: "Heartbeat Agent",
+        repoId: "repo-hb",
+        cliType: "noop",
+        cliConfig: {},
+        nodeId: "node-1",
+      },
+    });
+
+    const agentsBefore = await app.inject({
+      method: "GET",
+      url: "/api/v1/agents?meshId=mesh-hb",
+    });
+    expect(agentsBefore.statusCode).toBe(200);
+    const beforeData = agentsBefore.json() as { items: Array<{ nodeOnline?: boolean }> };
+    expect(beforeData.items[0]?.nodeOnline).toBe(false);
+
+    const hb = await app.inject({
+      method: "POST",
+      url: "/api/v1/nodes/node-1/heartbeat",
+      payload: { meshId: "mesh-hb" },
+    });
+    expect(hb.statusCode).toBe(204);
+
+    const agentsAfter = await app.inject({
+      method: "GET",
+      url: "/api/v1/agents?meshId=mesh-hb",
+    });
+    expect(agentsAfter.statusCode).toBe(200);
+    const afterData = agentsAfter.json() as { items: Array<{ nodeOnline?: boolean }> };
+    expect(afterData.items[0]?.nodeOnline).toBe(true);
+
+    await app.close();
+  });
 });

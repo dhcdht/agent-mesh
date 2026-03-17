@@ -80,6 +80,14 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       task_id TEXT,
       FOREIGN KEY(mesh_id) REFERENCES meshes(id)
     );
+
+    CREATE TABLE IF NOT EXISTS nodes (
+      id TEXT PRIMARY KEY,
+      mesh_id TEXT NOT NULL,
+      last_heartbeat_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'online',
+      FOREIGN KEY(mesh_id) REFERENCES meshes(id)
+    );
   `);
 
   // Migration: add task_id if table existed without it
@@ -147,6 +155,20 @@ const createTaskStmt = db.prepare(
   const countTasksByStatusStmt = db.prepare("SELECT status, COUNT(*) as c FROM tasks GROUP BY status");
   const countAgentsStmt = db.prepare("SELECT COUNT(*) as c FROM agents");
   const countMessagesStmt = db.prepare("SELECT COUNT(*) as c FROM messages");
+
+  const upsertNodeHeartbeatStmt = db.prepare(`
+    INSERT INTO nodes (id, mesh_id, last_heartbeat_at, status)
+    VALUES (?, ?, ?, 'online')
+    ON CONFLICT(id) DO UPDATE SET
+      mesh_id = excluded.mesh_id,
+      last_heartbeat_at = excluded.last_heartbeat_at,
+      status = 'online'
+  `);
+  const getNodeStatusStmt = db.prepare("SELECT status FROM nodes WHERE id = ?");
+  const markOfflineNodesStmt = db.prepare(`
+    UPDATE nodes SET status = 'offline'
+    WHERE last_heartbeat_at < ?
+  `);
 
   function mapMesh(row: any): Mesh {
     return {
@@ -407,6 +429,20 @@ listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] 
       tasks[row.status] = row.c;
     }
     return { meshes, tasks, agents, messages };
+  },
+
+  recordHeartbeat(nodeId: string, meshId: string): void {
+    upsertNodeHeartbeatStmt.run(nodeId, meshId, nowIso());
+  },
+
+  markOfflineNodes(thresholdMs: number): void {
+    const threshold = new Date(Date.now() - thresholdMs).toISOString();
+    markOfflineNodesStmt.run(threshold);
+  },
+
+  isNodeOnline(nodeId: string): boolean {
+    const row = getNodeStatusStmt.get(nodeId) as { status: string } | undefined;
+    return row?.status === "online";
   },
 };
 

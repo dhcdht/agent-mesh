@@ -21,6 +21,11 @@ export async function registerAgentRoutes(app: FastifyInstance): Promise<void> {
     if (!meshId) {
       return reply.code(400).send({ error: "meshId is required" });
     }
-    return reply.send({ items: app.storage.listAgents(meshId, nodeId) });
+    const agents = app.storage.listAgents(meshId, nodeId);
+    const items = agents.map((a) => ({
+      ...a,
+      nodeOnline: a.nodeId ? app.storage.isNodeOnline(a.nodeId) : undefined,
+    }));
+    return reply.send({ items });
   });
 }

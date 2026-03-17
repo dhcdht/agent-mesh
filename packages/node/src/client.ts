@@ -142,4 +142,11 @@ export class CoordinatorClient {
       body: JSON.stringify(input),
     });
   }
+
+  async heartbeat(nodeId: string, meshId: string): Promise<void> {
+    await this.request(`/api/v1/nodes/${encodeURIComponent(nodeId)}/heartbeat`, {
+      method: "POST",
+      body: JSON.stringify({ meshId }),
+    });
+  }
 }

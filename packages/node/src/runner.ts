@@ -110,6 +110,11 @@ export async function runNode(config: NodeConfig): Promise<void> {
       }
     }
 
-    await sleep(config.node.pollIntervalMs);
+    await Promise.all([
+      sleep(config.node.pollIntervalMs),
+      client.heartbeat(config.node.id, config.mesh.id).catch((e) => {
+        console.error(`[node:${config.node.id}] heartbeat failed:`, e);
+      }),
+    ]);
   }
 }

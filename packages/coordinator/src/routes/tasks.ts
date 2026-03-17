@@ -14,6 +14,7 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       const created = app.storage.createTask(parsed.data);
+      app.eventBus.emit({ type: "task.created", meshId: created.meshId, task: created });
       return reply.code(201).send(created);
     } catch {
       return reply.code(409).send({ error: "task already exists" });
@@ -33,6 +34,9 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const updated = app.storage.updateTask(taskId, parsed.data);
+    if (updated) {
+      app.eventBus.emit({ type: "task.updated", meshId: updated.meshId, task: updated });
+    }
     return reply.send(updated);
   });
 
