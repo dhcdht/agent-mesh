@@ -35,6 +35,15 @@
     <button id="refreshBtn">刷新</button>
     <label style="margin-left:1rem;"><input type="checkbox" id="autoRefresh" checked> 自动刷新 (10s)</label>
   </div>
+  <div class="section" id="agentsSection">
+    <h2>Agents</h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Name</th><th>Status</th><th>在线</th></tr>
+      </thead>
+      <tbody id="agentsBody"></tbody>
+    </table>
+  </div>
   <div class="section" id="tasksSection">
     <h2>任务</h2>
     <table>
@@ -54,6 +63,7 @@
     const API = '/api/v1';
     const meshSelect = document.getElementById('meshSelect');
     const meshInput = document.getElementById('meshInput');
+    const agentsBody = document.getElementById('agentsBody');
     const tasksBody = document.getElementById('tasksBody');
     const inboxBody = document.getElementById('inboxBody');
     const refreshBtn = document.getElementById('refreshBtn');
@@ -81,6 +91,26 @@
         if (saved) meshSelect.value = saved;
       } catch (e) {
         meshSelect.innerHTML = '<option value="">加载失败</option>';
+      }
+    }
+
+    async function loadAgents() {
+      const meshId = getMeshId();
+      if (!meshId) { agentsBody.innerHTML = '<tr><td colspan="4">请选择 mesh</td></tr>'; return; }
+      try {
+        const { items } = await fetchJson(`/agents?meshId=${encodeURIComponent(meshId)}`);
+        agentsBody.innerHTML = items.length === 0
+          ? '<tr><td colspan="4">无 agents</td></tr>'
+          : items.map(a => `
+            <tr>
+              <td>${a.id}</td>
+              <td>${a.name}</td>
+              <td class="status-${a.status}">${a.status}</td>
+              <td>${a.nodeOnline === true ? '🟢' : a.nodeOnline === false ? '🔴' : '-'}</td>
+            </tr>
+          `).join('');
+      } catch (e) {
+        agentsBody.innerHTML = '<tr><td colspan="4" class="error">加载失败</td></tr>';
       }
     }
 
@@ -144,6 +174,7 @@
     function refresh() {
       const id = getMeshId();
       if (id) localStorage.setItem('meshId', id);
+      loadAgents();
       loadTasks();
       loadInbox();
       errEl.textContent = '';

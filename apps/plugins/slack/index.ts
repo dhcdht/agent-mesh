@@ -1,11 +1,10 @@
 /**
- * Slack 插件骨架
- * 自举任务产出：agent-plugin
+ * Slack 插件：订阅 Coordinator SSE，转发任务/消息事件
  *
- * 连接 Coordinator 的占位，后续实现：
- * - 轮询 /api/v1/tasks、/api/v1/messages 或 SSE
- * - 推送到 Slack channel
- * - 接收 Slack 消息回调到 Coordinator
+ * 使用方式：
+ *   MESH_ID=xxx COORDINATOR_URL=http://localhost:3000 node index.js
+ *
+ * 可选：SLACK_TOKEN、SLACK_CHANNEL 配置后推送到 Slack
  */
 
 import type { ChatPlugin, PluginConfig, TaskEvent, MessageEvent } from "./types.js";
@@ -13,49 +12,111 @@ import type { ChatPlugin, PluginConfig, TaskEvent, MessageEvent } from "./types.
 export class SlackPlugin implements ChatPlugin {
   name = "slack";
   private config: PluginConfig | null = null;
-  private pollTimer: ReturnType<typeof setInterval> | null = null;
+  private abortController: AbortController | null = null;
 
   async start(config: PluginConfig): Promise<void> {
     this.config = config;
-    console.log(`[slack] plugin started, coordinator: ${config.coordinatorUrl}`);
-    // TODO: 连接 Coordinator，订阅任务/消息事件
-    // 占位：轮询或 SSE
-    this.pollTimer = setInterval(() => this.pollCoordinator(), 10000);
+    console.log(`[slack] plugin started, mesh: ${config.meshId}, coordinator: ${config.coordinatorUrl}`);
+    this.subscribeSSE();
   }
 
   async stop(): Promise<void> {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
     }
     this.config = null;
     console.log("[slack] plugin stopped");
   }
 
   onTaskUpdate?(event: TaskEvent): void {
-    // TODO: 推送到 Slack
-    console.log(`[slack] task update: ${event.taskId} -> ${event.status}`);
+    console.log(`[slack] task ${event.taskId} -> ${event.status}: ${event.subject ?? ""}`);
   }
 
   onMessage?(event: MessageEvent): void {
-    // TODO: 推送到 Slack
-    console.log(`[slack] message: ${event.from} -> ${event.to} (${event.type})`);
+    const payload = event.payload as Record<string, unknown>;
+    const text = payload?.text ?? payload?.summary ?? payload?.error ?? JSON.stringify(payload);
+    console.log(`[slack] message ${event.from} -> ${event.to} (${event.type}): ${String(text).slice(0, 100)}`);
   }
 
-  private async pollCoordinator(): Promise<void> {
-    if (!this.config) return;
-    try {
-      const res = await fetch(`${this.config.coordinatorUrl}/api/v1/meshes`, {
-        headers: this.config.apiKey ? { authorization: `Bearer ${this.config.apiKey}` } : {},
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { items?: unknown[] };
-        if (data.items && data.items.length > 0) {
-          // 占位：有 mesh 时可选拉取任务/消息
+  private subscribeSSE(): void {
+    const cfg = this.config;
+    if (!cfg) return;
+
+    this.abortController = new AbortController();
+    const url = `${cfg.coordinatorUrl.replace(/\/$/, "")}/api/v1/events?meshId=${encodeURIComponent(cfg.meshId)}`;
+    const headers: Record<string, string> = {};
+    if (cfg.apiKey) {
+      headers.authorization = `Bearer ${cfg.apiKey}`;
+    }
+
+    fetch(url, { signal: this.abortController.signal, headers })
+      .then(async (res) => {
+        if (!res.ok || !res.body) {
+          console.error(`[slack] SSE connect failed: ${res.status}`);
+          return;
         }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6)) as {
+                  type: string;
+                  meshId: string;
+                  task?: { id: string; status: string; subject?: string; owner?: string };
+                  message?: { from: string; to: string; type: string; payload: unknown };
+                };
+                this.handleEvent(data);
+              } catch {
+                // ignore parse error
+              }
+            }
+          }
+        }
+      })
+      .catch((e) => {
+        if (e?.name !== "AbortError") {
+          console.error("[slack] SSE error:", e);
+        }
+      });
+  }
+
+  private handleEvent(data: {
+    type: string;
+    meshId: string;
+    task?: { id: string; status: string; subject?: string; owner?: string };
+    message?: { from: string; to: string; type: string; payload: unknown };
+  }): void {
+    if (data.type === "task.created" || data.type === "task.updated") {
+      const t = data.task;
+      if (t) {
+        this.onTaskUpdate?.({
+          meshId: data.meshId,
+          taskId: t.id,
+          status: t.status,
+          subject: t.subject,
+          owner: t.owner,
+        });
       }
-    } catch {
-      // 静默忽略
+    } else if (data.type === "message.created") {
+      const m = data.message;
+      if (m) {
+        this.onMessage?.({
+          meshId: data.meshId,
+          from: m.from,
+          to: m.to,
+          type: m.type,
+          payload: m.payload,
+        });
+      }
     }
   }
 }

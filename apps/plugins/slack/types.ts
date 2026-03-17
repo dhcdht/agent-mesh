@@ -5,6 +5,7 @@
 
 export interface PluginConfig {
   coordinatorUrl: string;
+  meshId: string;
   apiKey?: string;
   slackToken?: string;
   slackChannel?: string;

@@ -82,11 +82,15 @@ docker-compose up -d
 docker-compose up -d --scale node=5
 ```
 
-### 7. 测试通过
+### 7. Web Dashboard
+- 任务列表、收件箱、人工标记完成
+- **Agents 列表**：展示 `nodeOnline`（🟢 在线 / 🔴 离线）
+
+### 8. 测试通过
 - 单元测试全部通过（含 broadcast、task:messages）
 - E2E 演示脚本可用
 
-### 8. 自举（Self-Host）
+### 9. 自举（Self-Host）
 - **config/mesh.selfhost.yaml**：3 agent（tester、plugin、research）协作
 - **scripts/bootstrap-selfhost.sh**：引导脚本
 - **pnpm node:selfhost**：启动自举 Node
@@ -216,11 +220,13 @@ docker-compose up -d --scale node=5
 
 **当前**：
 - ✅ Coordinator SSE：`GET /api/v1/events?meshId=xxx` 推送 `task.created`、`task.updated`、`message.created`
-- `apps/plugins/slack/` 骨架已有，`ChatPlugin` 接口已定义
+- ✅ Slack 插件：订阅 SSE、接收事件并回调 `onTaskUpdate`/`onMessage`（控制台输出）
+- 运行：`MESH_ID=xxx pnpm plugin:slack`
 
 **TODO**：
-1. 实现 Slack 插件：订阅 SSE、推送消息到 Slack、接收用户回复回调
-2. 飞书、Discord 插件（复用接口）
+1. Slack 推送：配置 SLACK_TOKEN、SLACK_CHANNEL 后推送到 Slack 频道
+2. 用户回复回调：Slack Event Subscriptions → Coordinator
+3. 飞书、Discord 插件（复用接口）
 
 详见 [AGENTS.md](../AGENTS.md) 六、聊天工具接入计划。
 

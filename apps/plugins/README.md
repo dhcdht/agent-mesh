@@ -8,9 +8,11 @@ Phase 5 预留：插件框架，统一消息出口（任务进展、agent 讨论
 
 ## 已实现
 
-- **slack/** — Slack 插件骨架（自举产出）
-  - `start`/`stop`、Coordinator 连接占位
-  - `onTaskUpdate`/`onMessage` 回调占位
+- **slack/** — Slack 插件
+  - 订阅 Coordinator SSE（`GET /api/v1/events?meshId=xxx`）
+  - 接收 `task.created`、`task.updated`、`message.created` 事件
+  - `onTaskUpdate`/`onMessage` 回调（当前输出到控制台）
+  - 运行：`MESH_ID=xxx pnpm plugin:slack`
 
 ## 计划支持
 

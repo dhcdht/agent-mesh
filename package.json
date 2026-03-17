@@ -13,7 +13,8 @@
     "node": "pnpm --filter @agent-mesh/node start config/mesh.example.yaml",
     "node:selfhost": "pnpm --filter @agent-mesh/node start ../../config/mesh.selfhost.yaml",
     "cli": "pnpm --filter @agent-mesh/cli start --",
-    "demo": "./scripts/phase1-e2e-demo.sh"
+    "demo": "./scripts/phase1-e2e-demo.sh",
+    "plugin:slack": "pnpm --filter @agent-mesh/plugins slack"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

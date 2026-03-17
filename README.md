@@ -28,7 +28,7 @@ Agent Mesh 是一个**分布式多 agent 协作系统**，用于协调多个 AI 
 | **任务协调** | 创建任务、分配 owner、依赖关系（DAG）、状态流转 |
 | **跨 agent 消息** | agent 间通过邮箱收发消息，向 lead 汇报进度 |
 | **多适配器** | OpenCode（HTTP）、Claude Code（文件）、stdin（子进程） |
-| **Web 控制台** | 查看任务、收件箱，人工标记完成 |
+| **Web 控制台** | 查看任务、收件箱、Agent 在线状态，人工标记完成 |
 | **CLI** | 创建 mesh、添加 repo、创建任务、查询 |
 | **指标与可观测** | `/metrics` 端点、mesh 列表、任务统计 |
 
@@ -222,7 +222,7 @@ pnpm coordinator
 - [Node 演示](docs/phase1-node-demo.md)
 - [Phase 3 适配器](docs/phase3-adapters.md)
 - [Phase 4 可观测性](docs/phase4-observability.md)
-- [聊天工具接入计划](docs/chat-plugin-integration.md)
+- [聊天工具接入计划](docs/chat-plugin-integration.md) — Slack 插件已支持 SSE 订阅
 
 ## License
 
