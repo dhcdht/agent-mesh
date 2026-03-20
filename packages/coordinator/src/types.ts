@@ -87,4 +87,5 @@ export interface CoordinatorStorage {
   isNodeOnline(nodeId: string): boolean;
   listNodes(meshId?: string): Array<{ id: string; meshId: string; lastHeartbeatAt: string; status: string }>;
   deleteNode(nodeId: string): boolean;
+  resetTimeoutTasks(timeoutMs: number): number;
 }

@@ -204,6 +204,10 @@ const createTaskStmt = db.prepare(
     UPDATE nodes SET status = 'offline'
     WHERE last_heartbeat_at < ?
   `);
+  const resetTimeoutTasksStmt = db.prepare(`
+    UPDATE tasks SET status = 'pending', updated_at = ?
+    WHERE status = 'in_progress' AND updated_at < ?
+  `);
 
   function mapMesh(row: any): Mesh {
     return {
@@ -508,6 +512,13 @@ listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] 
   deleteNode(nodeId: string): boolean {
     const result = deleteNodeStmt.run(nodeId);
     return (result as { changes: number }).changes > 0;
+  },
+
+  resetTimeoutTasks(timeoutMs: number): number {
+    const now = nowIso();
+    const threshold = new Date(Date.now() - timeoutMs).toISOString();
+    const result = resetTimeoutTasksStmt.run(now, threshold);
+    return (result as { changes: number }).changes;
   },
 };
 

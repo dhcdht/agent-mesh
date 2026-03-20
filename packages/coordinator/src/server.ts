@@ -79,13 +79,20 @@ export async function buildServer(dbPath: string): Promise<FastifyInstance> {
   return app;
 }
 
-const OFFLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
-const OFFLINE_CHECK_INTERVAL_MS = 30 * 1000; // 30 seconds
+const OFFLINE_THRESHOLD_MS = 2 * 60 * 1000;
+const OFFLINE_CHECK_INTERVAL_MS = 30 * 1000;
+const TASK_TIMEOUT_MS = 5 * 60 * 1000;
+const MONITOR_INTERVAL_MS = 10 * 1000;
 
-export function startOfflineCheckInterval(storage: CoordinatorStorage): NodeJS.Timeout {
+export function startBackgroundMonitor(storage: CoordinatorStorage): NodeJS.Timeout {
   return setInterval(() => {
     storage.markOfflineNodes(OFFLINE_THRESHOLD_MS);
-  }, OFFLINE_CHECK_INTERVAL_MS);
+    
+    const count = storage.resetTimeoutTasks(TASK_TIMEOUT_MS);
+    if (count > 0) {
+      console.log(`[Monitor] Reset ${count} timeout tasks back to pending`);
+    }
+  }, MONITOR_INTERVAL_MS);
 }
 
 async function main(): Promise<void> {
@@ -94,7 +101,7 @@ async function main(): Promise<void> {
   const dbPath = process.env.COORDINATOR_DB_PATH ?? "./agent-mesh.db";
 
   const app = await buildServer(dbPath);
-  startOfflineCheckInterval(app.storage);
+  startBackgroundMonitor(app.storage);
   await app.listen({ port, host });
 }
 

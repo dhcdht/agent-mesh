@@ -299,4 +299,52 @@ describe("coordinator api", () => {
 
     await app.close();
   });
+
+  it("resets timeout tasks back to pending", async () => {
+    const app = await createApp();
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/meshes",
+      payload: { id: "mesh-timeout", name: "timeout test" },
+    });
+
+    await app.inject({
+      method: "POST",
+      url: "/api/v1/tasks",
+      payload: {
+        id: "task-t1",
+        meshId: "mesh-timeout",
+        subject: "Timeout Task",
+        description: "will timeout",
+        owner: "agent-1",
+        repoId: "repo-1",
+      },
+    });
+
+    await app.inject({
+      method: "PATCH",
+      url: "/api/v1/tasks/task-t1",
+      payload: { status: "in_progress" },
+    });
+
+    const before = await app.inject({
+      method: "GET",
+      url: "/api/v1/tasks?meshId=mesh-timeout",
+    });
+    const beforeData = before.json() as { items: Array<{ status: string }> };
+    expect(beforeData.items[0]?.status).toBe("in_progress");
+
+    const resetCount = app.storage.resetTimeoutTasks(-1000); 
+    expect(resetCount).toBeGreaterThanOrEqual(1);
+
+    const after = await app.inject({
+      method: "GET",
+      url: "/api/v1/tasks?meshId=mesh-timeout",
+    });
+    const afterData = after.json() as { items: Array<{ status: string }> };
+    expect(afterData.items[0]?.status).toBe("pending");
+
+    await app.close();
+  });
 });
