@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import type { Task } from "@agent-mesh/shared";
-import type { AdapterExecutionResult, AgentAdapter } from "./types.js";
+import type { AdapterExecutionResult, AgentAdapter, MessageContext, DeliverResult } from "./types.js";
 
 interface StdinAdapterConfig {
   command: string;
@@ -28,16 +28,42 @@ function toConfig(cliConfig: Record<string, unknown>): StdinAdapterConfig {
 
 export class StdinAdapter implements AgentAdapter {
   private readonly config: StdinAdapterConfig;
+  private pendingMessages: MessageContext[] = [];
 
   constructor(private readonly agentId: string, cliConfig: Record<string, unknown>) {
     this.config = toConfig(cliConfig);
   }
 
+  async deliverMessage(ctx: MessageContext): Promise<DeliverResult> {
+    this.pendingMessages.push(ctx);
+    return { status: "delivered" };
+  }
+
   async execute(task: Task): Promise<AdapterExecutionResult> {
     const baseArgs = this.config.args ?? [];
+    let promptText = `${task.subject}\n\n${task.description}`;
+    
+    if (this.pendingMessages.length > 0) {
+      promptText += "\n\nRecent team messages:\n";
+      this.pendingMessages.forEach((msg, idx) => {
+        let payloadStr = "";
+        if (typeof msg.payload === "string") {
+          payloadStr = msg.payload;
+        } else {
+          try {
+            payloadStr = JSON.stringify(msg.payload);
+          } catch {
+            payloadStr = String(msg.payload);
+          }
+        }
+        promptText += `${idx + 1}. [${msg.from} -> ${msg.to}] (${msg.type}): ${payloadStr}\n`;
+      });
+      this.pendingMessages = [];
+    }
+
     const args = this.config.argsOnly
       ? baseArgs
-      : [...baseArgs, `${task.subject}\n\n${task.description}`];
+      : [...baseArgs, promptText];
 
     return new Promise((resolve, reject) => {
       const proc = spawn(this.config.command, args, {

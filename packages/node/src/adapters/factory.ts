@@ -1,5 +1,6 @@
 import type { AgentAdapter } from "./types.js";
 import { AcpAdapter } from "./acp.js";
+import { AcpPoolAdapter } from "./acp-pool.js";
 import { ClaudeCodeAdapter } from "./claude-code.js";
 import { NoopAdapter } from "./noop.js";
 import { OpenCodeAdapter } from "./opencode.js";
@@ -19,6 +20,8 @@ export function createAdapter(
   switch (cliType) {
     case "acp":
       return new AcpAdapter(agentId, merged);
+    case "acp-pool":
+      return new AcpPoolAdapter(agentId, merged);
     case "opencode":
       return new OpenCodeAdapter(agentId, merged);
     case "opencode-cli":
