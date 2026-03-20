@@ -76,8 +76,9 @@ export interface CoordinatorStorage {
 
   createMessage(input: CreateMessageInput): Message;
   listInbox(params: { meshId: string; agentId: string; unreadOnly: boolean }): Message[];
+  listChannel(params: { meshId: string; since?: string }): Message[];
   listMessagesByTask(params: { meshId: string; taskId: string }): Message[];
-  markMessageRead(messageId: string): Message | undefined;
+  markMessageRead(messageId: string, agentId?: string): Message | undefined;
 
   getMetrics(): { meshes: number; tasks: Record<string, number>; agents: number; messages: number };
 

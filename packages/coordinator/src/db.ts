@@ -93,6 +93,7 @@ export function createStorage(dbPath: string): CoordinatorStorage {
     CREATE INDEX IF NOT EXISTS idx_tasks_mesh_owner ON tasks(mesh_id, owner);
     CREATE INDEX IF NOT EXISTS idx_messages_mesh_recipient ON messages(mesh_id, recipient);
     CREATE INDEX IF NOT EXISTS idx_messages_mesh_task ON messages(mesh_id, task_id);
+    CREATE INDEX IF NOT EXISTS idx_messages_mesh_timestamp ON messages(mesh_id, timestamp);
     CREATE INDEX IF NOT EXISTS idx_nodes_mesh ON nodes(mesh_id);
     CREATE INDEX IF NOT EXISTS idx_agents_mesh ON agents(mesh_id);
   `);
@@ -103,6 +104,17 @@ export function createStorage(dbPath: string): CoordinatorStorage {
   } catch (_) {
     // column already exists
   }
+
+  // Migration: message_read for broadcast (to="*") per-agent read tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS message_read (
+      message_id TEXT NOT NULL,
+      agent_id TEXT NOT NULL,
+      PRIMARY KEY (message_id, agent_id),
+      FOREIGN KEY (message_id) REFERENCES messages(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_message_read_agent ON message_read(agent_id);
+  `);
 
   const createMeshStmt = db.prepare(
     "INSERT INTO meshes (id, name, status, created_at, completed_at) VALUES (?, ?, ?, ?, ?)"
@@ -150,8 +162,21 @@ const createTaskStmt = db.prepare(
   const createMessageStmt = db.prepare(
     "INSERT INTO messages (id, mesh_id, sender, recipient, type, payload, timestamp, is_read, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
   );
-  const listInboxStmt = db.prepare(
-    "SELECT * FROM messages WHERE mesh_id = ? AND recipient = ? AND (? = 0 OR is_read = 0) ORDER BY timestamp ASC"
+  const listInboxStmt = db.prepare(`
+    SELECT m.* FROM messages m
+    WHERE m.mesh_id = ? AND (
+      (m.recipient = ? AND (? = 0 OR m.is_read = 0))
+      OR (m.recipient = '*' AND (? = 0 OR NOT EXISTS (
+        SELECT 1 FROM message_read mr WHERE mr.message_id = m.id AND mr.agent_id = ?
+      )))
+    )
+    ORDER BY m.timestamp ASC
+  `);
+  const listChannelStmt = db.prepare(
+    "SELECT * FROM messages WHERE mesh_id = ? AND (? IS NULL OR timestamp > ?) ORDER BY timestamp ASC"
+  );
+  const insertMessageReadStmt = db.prepare(
+    "INSERT OR IGNORE INTO message_read (message_id, agent_id) VALUES (?, ?)"
   );
   const listMessagesByTaskStmt = db.prepare(
     "SELECT * FROM messages WHERE mesh_id = ? AND task_id = ? ORDER BY timestamp ASC"
@@ -414,8 +439,15 @@ listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] 
   },
 
   listInbox(params: { meshId: string; agentId: string; unreadOnly: boolean }): Message[] {
+    const u = params.unreadOnly ? 1 : 0;
     return listInboxStmt
-      .all(params.meshId, params.agentId, params.unreadOnly ? 1 : 0)
+      .all(params.meshId, params.agentId, u, u, params.agentId)
+      .map(mapMessage);
+  },
+
+  listChannel(params: { meshId: string; since?: string }): Message[] {
+    return listChannelStmt
+      .all(params.meshId, params.since ?? null, params.since ?? null)
       .map(mapMessage);
   },
 
@@ -423,10 +455,16 @@ listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] 
     return listMessagesByTaskStmt.all(params.meshId, params.taskId).map(mapMessage);
   },
 
-  markMessageRead(messageId: string): Message | undefined {
-    markMessageReadStmt.run(messageId);
-    const row = getMessageStmt.get(messageId);
-    return row ? mapMessage(row) : undefined;
+  markMessageRead(messageId: string, agentId?: string): Message | undefined {
+    const row = getMessageStmt.get(messageId) as { recipient: string } | undefined;
+    if (!row) return undefined;
+    if (row.recipient === "*") {
+      if (agentId) insertMessageReadStmt.run(messageId, agentId);
+    } else {
+      markMessageReadStmt.run(messageId);
+    }
+    const msg = getMessageStmt.get(messageId);
+    return msg ? mapMessage(msg) : undefined;
   },
 
   getMetrics(): { meshes: number; tasks: Record<string, number>; agents: number; messages: number } {

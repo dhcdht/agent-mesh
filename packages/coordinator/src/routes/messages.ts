@@ -22,27 +22,14 @@ export async function registerMessageRoutes(app: FastifyInstance): Promise<void>
     const isBroadcast = BROADCAST_ALIASES.includes(to);
 
     if (isBroadcast) {
-      const agents = app.storage.listAgents(parsed.data.meshId);
-      const recipients = agents
-        .map((a) => a.id)
-        .filter((id) => id !== parsed.data.from);
-      const created: Array<{ id: string; to: string }> = [];
-      for (const agentId of recipients) {
-        const msgId = `${parsed.data.id}-${agentId}`;
-        try {
-          const m = app.storage.createMessage({
-            ...parsed.data,
-            id: msgId,
-            to: agentId,
-            type: parsed.data.type === "message" ? "broadcast" : parsed.data.type,
-          } as CreateMessageInput);
-          created.push({ id: m.id, to: m.to });
-          app.eventBus.emit({ type: "message.created", meshId: parsed.data.meshId, message: m });
-        } catch {
-          // 已存在则跳过
-        }
-      }
-      return reply.code(201).send({ broadcast: true, created });
+      // 群聊：广播存单条，to="*"，所有人通过 channel 或 inbox 可见
+      const m = app.storage.createMessage({
+        ...parsed.data,
+        to: BROADCAST_RECIPIENT,
+        type: parsed.data.type === "message" ? "broadcast" : parsed.data.type,
+      } as CreateMessageInput);
+      app.eventBus.emit({ type: "message.created", meshId: parsed.data.meshId, message: m });
+      return reply.code(201).send({ broadcast: true, message: m });
     }
 
     try {
@@ -72,7 +59,8 @@ export async function registerMessageRoutes(app: FastifyInstance): Promise<void>
 
   app.post("/messages/:messageId/read", async (request, reply) => {
     const { messageId } = request.params as { messageId: string };
-    const message = app.storage.markMessageRead(messageId);
+    const { agentId } = request.query as { agentId?: string };
+    const message = app.storage.markMessageRead(messageId, agentId);
     if (!message) {
       return reply.code(404).send({ error: "message not found" });
     }

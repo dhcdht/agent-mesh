@@ -36,6 +36,18 @@ export async function registerMeshRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(mesh);
   });
 
+  /** 群聊 channel：返回 mesh 内所有消息，按时间排序 */
+  app.get("/meshes/:meshId/channel", async (request, reply) => {
+    const { meshId } = request.params as { meshId: string };
+    const { since } = request.query as { since?: string };
+    const mesh = app.storage.getMesh(meshId);
+    if (!mesh) {
+      return reply.code(404).send({ error: "mesh not found" });
+    }
+    const items = app.storage.listChannel({ meshId, since });
+    return reply.send({ items });
+  });
+
   app.patch("/meshes/:meshId", async (request, reply) => {
     const { meshId } = request.params as { meshId: string };
     const parsed = updateMeshSchema.safeParse(request.body);
