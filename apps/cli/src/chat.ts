@@ -18,6 +18,20 @@ import type { CliClient } from "./client.js";
 
 const LEAD_ID = "lead";
 const POLL_INTERVAL_MS = 3000;
+const DASHBOARD_LINES = 6;
+
+interface TaskSummary {
+  id: string;
+  subject: string;
+  status: string;
+  owner: string;
+  updatedAt: string;
+}
+
+interface AgentSummary {
+  id: string;
+  nodeOnline?: boolean;
+}
 
 interface ChatContext {
   client: CliClient;
@@ -40,8 +54,44 @@ function formatMessage(m: ChannelMessage): string {
   const payload = m.payload as Record<string, unknown>;
   const text = payload?.text ?? payload?.summary ?? payload?.error ?? JSON.stringify(payload);
   const taskTag = m.taskId ? ` [task:${m.taskId}]` : "";
-  const sender = m.from === LEAD_ID ? "你" : m.from;
-  return `  ${ts} ${sender}: ${String(text).slice(0, 300)}${taskTag ? ` ${taskTag}` : ""}`;
+  const sender = m.from === LEAD_ID ? "\x1b[32m你\x1b[39m" : `\x1b[34m${m.from}\x1b[39m`;
+  return `  \x1b[90m${ts}\x1b[39m ${sender}: ${String(text).slice(0, 300)}${taskTag ? ` \x1b[90m${taskTag}\x1b[39m` : ""}`;
+}
+
+async function fetchTasks(ctx: ChatContext): Promise<TaskSummary[]> {
+  const res = await ctx.client.request<{ items: TaskSummary[] }>(
+    "GET",
+    `/api/v1/tasks?meshId=${encodeURIComponent(ctx.meshId)}`
+  );
+  return res.items ?? [];
+}
+
+async function fetchAgents(ctx: ChatContext): Promise<AgentSummary[]> {
+  const res = await ctx.client.request<{ items: AgentSummary[] }>(
+    "GET",
+    `/api/v1/agents?meshId=${encodeURIComponent(ctx.meshId)}`
+  );
+  return res.items ?? [];
+}
+
+function renderDashboard(tasks: TaskSummary[], agents: AgentSummary[]): void {
+  process.stdout.write("\x1b[s\x1b[1;1H");
+  
+  const activeTasks = tasks.filter(t => t.status === "in_progress");
+  const onlineAgents = agents.filter(a => a.nodeOnline);
+  
+  process.stdout.write(`\x1b[1;36m[DASHBOARD] Tasks: ${activeTasks.length} active, ${tasks.length} total | Agents: ${onlineAgents.length} online\x1b[0m\x1b[K\n`);
+  
+  if (activeTasks.length > 0) {
+    const t = activeTasks[0]!;
+    process.stdout.write(`\x1b[K  Active: \x1b[33m${t.id}\x1b[39m ${t.subject.slice(0, 40)} (owner: ${t.owner})\n`);
+  } else {
+    process.stdout.write("\x1b[K  No active tasks\n");
+  }
+  
+  process.stdout.write("\x1b[K" + "─".repeat(process.stdout.columns || 60) + "\n");
+  
+  process.stdout.write("\x1b[u");
 }
 
 async function fetchChannel(ctx: ChatContext, since?: string): Promise<ChannelMessage[]> {
@@ -181,18 +231,26 @@ export async function runChat(ctx: ChatContext): Promise<void> {
   const poll = async (): Promise<void> => {
     if (closed) return;
     try {
-      const items = await fetchChannel(ctx, lastSeenTimestamp);
+      const [messages, tasks, agents] = await Promise.all([
+        fetchChannel(ctx, lastSeenTimestamp),
+        fetchTasks(ctx),
+        fetchAgents(ctx),
+      ]);
+      
       if (closed) return;
-      if (items.length > 0) {
-        displayMessages(items);
+      renderDashboard(tasks, agents);
+      
+      if (messages.length > 0) {
+        displayMessages(messages);
         if (!closed) rl.prompt();
       }
     } catch {
-      // 静默忽略轮询错误
     }
   };
 
   pollTimer = setInterval(poll, POLL_INTERVAL_MS);
+  
+  process.stdout.write("\n".repeat(DASHBOARD_LINES));
   poll();
 
   const prompt = (): void => {
