@@ -130,9 +130,22 @@ export class CoordinatorClient {
     return response.items;
   }
 
-  async markMessageRead(messageId: string): Promise<void> {
-    await this.request(`/api/v1/messages/${encodeURIComponent(messageId)}/read`, {
+  async listChannel(
+    meshId: string,
+    since?: string
+  ): Promise<Array<{ id: string; from: string; to: string; type: string; payload: unknown; taskId?: string; timestamp?: string }>> {
+    const q = since ? `?since=${encodeURIComponent(since)}` : "";
+    const response = await this.request<{
+      items: Array<{ id: string; from: string; to: string; type: string; payload: unknown; taskId?: string; timestamp?: string }>;
+    }>(`/api/v1/meshes/${encodeURIComponent(meshId)}/channel${q}`);
+    return response.items;
+  }
+
+  async markMessageRead(messageId: string, agentId?: string): Promise<void> {
+    const q = agentId ? `?agentId=${encodeURIComponent(agentId)}` : "";
+    await this.request(`/api/v1/messages/${encodeURIComponent(messageId)}/read${q}`, {
       method: "POST",
+      body: "{}",
     });
   }
 
