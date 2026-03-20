@@ -10,6 +10,7 @@
     "test": "pnpm -r run test",
     "dev": "pnpm -r run dev",
     "coordinator": "pnpm --filter @agent-mesh/coordinator dev",
+    "coordinator:stable": "pnpm --filter @agent-mesh/coordinator build && pnpm --filter @agent-mesh/coordinator start",
     "node": "pnpm --filter @agent-mesh/node start config/mesh.example.yaml",
     "node:selfhost": "pnpm --filter @agent-mesh/node start ../../config/mesh.selfhost.yaml",
     "cli": "pnpm --filter @agent-mesh/cli start --",

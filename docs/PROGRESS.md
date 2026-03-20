@@ -1,5 +1,22 @@
 # Agent Mesh 开发进度文档
 
+## 当前状态总结（2025-03）
+
+### 进展
+- **群聊协作修复**：移除 `runner.ts` 中 `isFromLead` 限制，所有 agent 间的 `message`/`broadcast` 都会触发实时回复，实现真正的多 agent 协作
+- **自举模式可用**：agent-plugin / agent-research 使用 `stdin + claude -p`，配合修复后的 runner，支持实时群聊和协作
+- **ACP 进程池**：实现 `acp-pool` 适配器作为备选方案（当 ACP 实现可用时）
+- **群聊与 CLI Chat**：广播消息、channel API、`listChannel` 已实现
+
+### 已知问题
+- **opencode acp 不可用**：initialize ~98s 后返回 "Internal error"，无法使用
+- **当前方案**：使用 `stdin + claude -p`，通过 runner 的实时触发机制实现协作（无需 ACP 的 deliverMessage）
+
+### 调试与排障
+- 集中说明见 [docs/troubleshooting.md](troubleshooting.md)（ACP 延迟、`acp-pool`、Runner 群聊行为、调试脚本索引）
+
+---
+
 ## 一、项目核心定位
 
 Agent Mesh 是一个**分布式多 AI Agent 协作系统**，专注于解决多个 AI 编程 Agent 之间的任务协调与通信问题。
@@ -23,7 +40,8 @@ Agent Mesh 是一个**分布式多 AI Agent 协作系统**，专注于解决多�
 | 适配器 | 类型 | 说明 |
 |--------|------|------|
 | `noop` | 模拟 | 仅打印日志，用于测试 |
-| `acp` | ACP 协议 | 通过 `opencode acp` 命令，支持自动权限审批、**deliverMessage**（消息注入下次任务 prompt） |
+| `acp` | ACP 协议 | 每次任务新进程，支持自动权限审批、**deliverMessage**。opencode 冷启动 ~98s |
+| `acp-pool` | ACP 进程池 | **复用进程**，首次 ~98s，后续任务快速执行，支持 **deliverMessage**（实时消息注入） |
 | `claude-code` | 文件 | 写入 Claude Code inbox，支持 **deliverMessage**（agent 间消息） |
 | `opencode` | HTTP | OpenCode serve API |
 | `opencode-cli` | 子进程 | opencode run 命令 |
@@ -104,7 +122,11 @@ docker-compose up -d --scale node=5
 - **scripts/bootstrap-selfhost.sh**：引导脚本
 - **pnpm node:selfhost**：启动自举 Node
 - **产出**：Slack 插件骨架、agent-coordination-patterns.md
-- **真实执行**：自举已改用 stdin+acp。agent-tester 用 stdin 执行 `pnpm test`，agent-plugin/research 用 `opencode acp` 写代码。`cwd` 由 repo.path 自动注入。
+- **真实执行**：
+  - agent-tester 用 stdin 执行 `pnpm test`
+  - agent-plugin/research 用 **stdin + claude -p**，通过 runner 实时触发实现群聊协作
+  - 所有 agent 间的 message/broadcast 都会触发实时回复，无需 ACP 的 deliverMessage
+  - `cwd` 由 repo.path 自动注入
 
 ## 三、遇到的问题与解决方案
 
@@ -132,6 +154,27 @@ docker-compose up -d --scale node=5
 3. `session/prompt`：传 `sessionId`、`prompt: [{type:"text", text: "..."}]`
 4. `session/request_permission`：自动响应 `outcome: "selected", optionId: "allow-once"`
 5. 过滤 stdout 中的 OSC 转义序列（opencode 已知问题）
+
+### 问题 1c：ACP chat 回复混入协议输出（已修复）
+**现象**：agent-plugin 的 chat 式回复发到群组时，payload 是 raw JSON-RPC 协议流而非可读文本。
+
+**原因**：`summary` 使用 `out.slice(-500)`（stdout 最后 500 字符），而 stdout 是完整 JSON-RPC 流。
+
+**解决方案**：解析 `session/update` 通知，提取 `sessionUpdate: "agent_message_chunk"` 的 `content.text`，拼接成 summary；无提取时回退到 stdout 尾部。
+
+### 问题 1d：ACP 180s 超时实为 lineBuffer 未 flush（已修复）
+**现象**：agent 有输出（agent_message_chunk）但最终报 "ACP adapter timed out"，看似无回复。
+
+**原因**：按 `\n` 分行解析 JSON-RPC，最后一条若不以换行结尾会留在 `lineBuffer`，永不处理。`session/prompt` 的响应（id 2）常为最后一条，导致永远等不到 `finish("success")`。
+
+**解决方案**：在 timeout 和 `proc.on("close")` 时调用 `flushLineBuffer()`，处理剩余 buffer 再决定 resolve/reject。
+
+### 问题 1e：opencode acp initialize ~98s 延迟（已修复）
+**现象**：agent-plugin 一句简单 chat 回复耗时 4.5 分钟；根因为 opencode 对 `initialize` 的响应约 98 秒。
+
+**原因**：opencode 冷启动时 initialize 阶段做较重操作；预热无效，每次 spawn 新进程都冷启动。
+
+**解决方案**：实现 **ACP 进程池**（`acp-pool` 适配器）。首次初始化 ~98s，后续任务复用同一进程，无需重新初始化。支持真正的 deliverMessage（实时消息注入）。详见 `packages/node/src/adapters/acp-pool.ts`。
 
 ### 问题 2：删除 DAG 任务依赖管理
 **原始设计**：Task 有 `blockedBy` 和 `blocks` 字段，用于表示任务依赖关系。
@@ -263,10 +306,11 @@ repos:
     agent:
       id: agent-1
       name: Dev Agent
-      cliType: acp
+      cliType: stdin
       cliConfig:
-        command: opencode
-        args: ["acp"]
+        command: claude
+        args: ["-p"]
+        timeoutMs: 180000
 coordinator:
   url: http://localhost:3000
 node:
@@ -307,9 +351,15 @@ pnpm cli task:create --id task-1 --mesh-id test-mesh \
 ### 发现与修复
 
 - **Chat /quit**：`closed` 标志位 + `setImmediate` 延迟 prompt，避免 rl.close() 后再次调用 rl.question
-- **ACP 超时**：agent-research 部分任务 180s 超时，可能因 opencode 响应慢或任务复杂度高
+- **ACP 超时**：opencode acp 的 initialize ~98s，导致整体超时；**已规避**：改用 claude -p + stdin
 - **agent-plugin 完成 task-chat-fix**：ACP 适配器修复后 agent-plugin 可正常执行代码任务
+
+### 近期变更（2025-03）
+
+- agent-plugin、agent-research 从 opencode acp 切换为 claude -p（stdin 适配器）
+- ACP 适配器支持可配置 `command`/`args`
+- 新增 `scripts/debug-claude-stdin.mjs` 用于验证 claude -p 延迟
 
 ---
 
-*文档更新日期：2025-03-16*
+*文档更新日期：2025-03-18*

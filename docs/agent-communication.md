@@ -38,13 +38,23 @@ POST /api/v1/messages
 }
 ```
 
-**广播**：当 `to` 为 `*` 或 `all` 时，消息会 fan-out 到 mesh 内所有 agent（不含 sender）。
+**广播**：当 `to` 为 `*` 或 `all` 时，消息存为单条（recipient=`*`），所有人通过 channel 或 inbox 可见。
 
-### 收件箱
+### 群聊 Channel（核心）
+
+```
+GET /api/v1/meshes/:meshId/channel?since=<timestamp>
+```
+
+返回 mesh 内所有消息，按时间排序。`since` 可选，用于增量拉取。
+
+### 收件箱（Agent 轮询）
 
 ```
 GET /api/v1/messages/:agentId/inbox?meshId=mesh-1&unreadOnly=true
 ```
+
+Agent 的 inbox 包含：`to="*"` 的广播消息 + `to=agentId` 的点对点消息。广播的已读状态由 `message_read` 表按 agent 记录。
 
 ### 按任务查会话历史
 
@@ -55,8 +65,10 @@ GET /api/v1/tasks/:taskId/messages?meshId=mesh-1
 ### 标记已读
 
 ```
-POST /api/v1/messages/:messageId/read
+POST /api/v1/messages/:messageId/read?agentId=<agentId>
 ```
+
+广播消息（`to="*"`）需传 `agentId` 以记录该 agent 已读；点对点消息无需。
 
 ## 四、Runner 与 Adapter 集成
 
@@ -70,8 +82,9 @@ POST /api/v1/messages/:messageId/read
 |--------|---------------------|
 | `noop` | 直接返回 delivered |
 | `claude-code` | 追加到 Claude Code inbox JSON 文件 |
-| `acp` | 写入临时文件，下次 `execute` 时注入 prompt |
-| `stdin` / `opencode` | 未实现，Runner 仅打印 |
+| `acp` / `acp-pool` | 写入临时文件或复用会话，下次 `execute` 时注入 prompt |
+| `stdin` | `message`/`broadcast` 走 **chat 路径**：合成任务调用 `execute`（非 `argsOnly`）；无 `deliverMessage` 时仍可多 Agent 协作 |
+| `opencode`（HTTP 等） | 视适配器实现；未实现投递时仅记录日志 |
 
 ## 五、CLI 示例
 
@@ -94,5 +107,7 @@ pnpm cli task:messages --mesh-id m1 --task-id task-1
 2. **agent-a 执行中** → 向 agent-b 发 `question`（需 API 路径）
 3. **agent-b 收到** → Runner 调用 `deliverMessage`，消息写入 b 的 inbox
 4. **agent-b 下次执行** → ACP 适配器将消息注入 prompt，b 回复
-5. **agent-b 发 `answer`** → 给 agent-a
-6. **agent-a 收到** → 继续任务，完成后发 `done` 给 lead
+5. **agent-b 发 `answer`** → 发到群组（`to="*"`），lead 与 agent-a 均可见
+6. **agent-a 收到** → 继续任务，完成后发 `done` 到群组
+
+**群聊**：Lead、所有 Agent 共享同一 channel，彼此可见所有消息。CLI chat 通过 `GET /meshes/:meshId/channel` 拉取群聊流。

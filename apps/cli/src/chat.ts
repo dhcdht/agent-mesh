@@ -1,11 +1,11 @@
 /**
- * Chat 交互模式：用户与 agents 交流，查看 agent 间沟通与任务进展
+ * 群聊模式：lead + agents 共享同一消息流，类似普通 agent CLI 的 chat 体验
  *
  * 用法：
  *   @agent-id 消息  → 发给指定 agent
  *   * 消息         → 广播给所有 agents
- *   消息           → 默认广播
- *   /task <id>     → 查看任务相关会话（含 agent 间讨论）
+ *   消息           → 默认广播（群组可见）
+ *   /task <id>     → 查看任务相关会话
  *   /tasks        → 列出任务
  *   /agents       → 列出 agents
  *   /help, ?      → 帮助
@@ -17,7 +17,7 @@ import { randomUUID } from "node:crypto";
 import type { CliClient } from "./client.js";
 
 const LEAD_ID = "lead";
-const POLL_INTERVAL_MS = 4000;
+const POLL_INTERVAL_MS = 3000;
 
 interface ChatContext {
   client: CliClient;
@@ -25,39 +25,32 @@ interface ChatContext {
   baseUrl: string;
 }
 
-function formatMessage(m: {
+interface ChannelMessage {
   id: string;
   from: string;
+  to: string;
   type: string;
   payload: unknown;
   taskId?: string;
   timestamp?: string;
-}): string {
+}
+
+function formatMessage(m: ChannelMessage): string {
   const ts = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : "";
   const payload = m.payload as Record<string, unknown>;
   const text = payload?.text ?? payload?.summary ?? payload?.error ?? JSON.stringify(payload);
   const taskTag = m.taskId ? ` [task:${m.taskId}]` : "";
-  return `  ${ts} [${m.from}] (${m.type})${taskTag}: ${String(text).slice(0, 200)}`;
+  const sender = m.from === LEAD_ID ? "你" : m.from;
+  return `  ${ts} ${sender}: ${String(text).slice(0, 300)}${taskTag ? ` ${taskTag}` : ""}`;
 }
 
-async function pollInbox(ctx: ChatContext, lastSeenIds: Set<string>): Promise<string[]> {
-  const res = await ctx.client.request<{ items: Array<{ id: string; from: string; type: string; payload: unknown; taskId?: string; timestamp?: string }> }>(
+async function fetchChannel(ctx: ChatContext, since?: string): Promise<ChannelMessage[]> {
+  const q = since ? `?since=${encodeURIComponent(since)}` : "";
+  const res = await ctx.client.request<{ items: ChannelMessage[] }>(
     "GET",
-    `/api/v1/messages/${LEAD_ID}/inbox?meshId=${encodeURIComponent(ctx.meshId)}&unreadOnly=true`
+    `/api/v1/meshes/${encodeURIComponent(ctx.meshId)}/channel${q}`
   );
-  const lines: string[] = [];
-  for (const m of res.items ?? []) {
-    if (lastSeenIds.has(m.id)) continue;
-    lastSeenIds.add(m.id);
-    lines.push(formatMessage(m));
-    // 标记已读
-    try {
-      await ctx.client.request("POST", `/api/v1/messages/${encodeURIComponent(m.id)}/read`);
-    } catch {
-      // ignore
-    }
-  }
-  return lines;
+  return res.items ?? [];
 }
 
 async function sendMessage(ctx: ChatContext, to: string, text: string, taskId?: string): Promise<void> {
@@ -144,6 +137,7 @@ export async function runChat(ctx: ChatContext): Promise<void> {
   }
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  let lastSeenTimestamp: string | undefined;
   const lastSeenIds = new Set<string>();
   let closed = false;
 
@@ -159,23 +153,41 @@ export async function runChat(ctx: ChatContext): Promise<void> {
     process.exit(0);
   };
 
-  console.log(`\n  Agent Mesh Chat — mesh: ${ctx.meshId}`);
-  console.log("  输入消息与 agents 交流，/help 查看命令\n");
+  const displayMessages = (items: ChannelMessage[]): void => {
+    for (const m of items) {
+      if (lastSeenIds.has(m.id)) continue;
+      lastSeenIds.add(m.id);
+      console.log(formatMessage(m));
+      if (m.timestamp) lastSeenTimestamp = m.timestamp;
+    }
+  };
+
+  console.log(`\n  Agent Mesh 群聊 — mesh: ${ctx.meshId}`);
+  console.log("  lead + agents 共享消息流，/help 查看命令\n");
+
+  // 初始加载历史
+  try {
+    const history = await fetchChannel(ctx);
+    if (history.length > 0) {
+      displayMessages(history);
+      console.log("");
+    }
+  } catch {
+    // 忽略
+  }
 
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
   const poll = async (): Promise<void> => {
     if (closed) return;
     try {
-      const lines = await pollInbox(ctx, lastSeenIds);
+      const items = await fetchChannel(ctx, lastSeenTimestamp);
       if (closed) return;
-      if (lines.length > 0) {
-        for (const line of lines) {
-          console.log(line);
-        }
+      if (items.length > 0) {
+        displayMessages(items);
         if (!closed) rl.prompt();
       }
-    } catch (e) {
+    } catch {
       // 静默忽略轮询错误
     }
   };
@@ -258,7 +270,7 @@ export async function runChat(ctx: ChatContext): Promise<void> {
 
       try {
         await sendMessage(ctx, to, text);
-        console.log(`  → 已发送给 ${to}`);
+        console.log(`  → 已发送${to === "*" ? "到群组" : `给 @${to}`}`);
       } catch (e) {
         console.error("  发送失败:", e instanceof Error ? e.message : e);
       }

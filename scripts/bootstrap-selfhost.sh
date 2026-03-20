@@ -6,6 +6,7 @@ set -e
 COORD=${MESH_COORDINATOR_URL:-http://localhost:3000}
 MESH_ID=agent-mesh-dev
 PROJECT_PATH="$(cd "$(dirname "$0")/.." && pwd)"
+SELFHOST_DB_PATH=${COORDINATOR_DB_PATH:-$PROJECT_PATH/agent-mesh.selfhost.db}
 
 echo "=== Agent Mesh 自举引导 ==="
 echo "Coordinator: $COORD"
@@ -45,7 +46,8 @@ curl -s -X POST "$COORD/api/v1/tasks" \
 echo "[4/5] 完成"
 echo ""
 echo "=== 下一步 ==="
-echo "1. 启动 Node: pnpm node config/mesh.selfhost.yaml"
-echo "2. 启动 Chat: pnpm cli chat --mesh-id $MESH_ID"
-echo "3. 在 Chat 中：发消息、/tasks 查看、/task task-id 查看 agent 间讨论"
+echo "1. 稳定模式启动 Coordinator: COORDINATOR_DB_PATH=$SELFHOST_DB_PATH pnpm coordinator:stable"
+echo "2. 启动 Node: pnpm node:selfhost"
+echo "3. 启动 Chat: pnpm cli chat --mesh-id $MESH_ID"
+echo "4. 在 Chat 中：发消息、/tasks 查看、/task task-id 查看 agent 间讨论"
 echo ""

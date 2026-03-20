@@ -115,9 +115,11 @@ describe("coordinator api", () => {
       },
     });
     expect(broadcast.statusCode).toBe(201);
-    const bcData = broadcast.json() as { broadcast: boolean; created: Array<{ id: string; to: string }> };
+    const bcData = broadcast.json() as { broadcast: boolean; message: { id: string; to: string } };
     expect(bcData.broadcast).toBe(true);
-    expect(bcData.created).toHaveLength(2);
+    expect(bcData.message).toBeDefined();
+    expect(bcData.message.id).toBe("bc1");
+    expect(bcData.message.to).toBe("*");
 
     const inboxX = await app.inject({
       method: "GET",

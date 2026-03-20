@@ -10,3 +10,7 @@ dist/
 teams/
 config/dev-mesh.yaml
 packages/node/config/
+
+# 本地跑 Coordinator/Node 时产生的日志与 pid（勿提交）
+/*.log
+/*.pid

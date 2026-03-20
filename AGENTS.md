@@ -48,8 +48,8 @@ Agent Mesh 是分布式多 Agent 协作系统，协调多个 AI 编程 Agent 完
 | Agent | cliType | 职责 | 适用任务 |
 |-------|---------|------|----------|
 | agent-tester | stdin | 运行测试 | 执行 `pnpm test`、验证构建 |
-| agent-plugin | acp | 写代码 | 实现功能、修复 bug、重构 |
-| agent-research | acp | 文档 | 补充文档、研究、设计 |
+| agent-plugin | stdin (claude -p) | 写代码 | 实现功能、修复 bug、重构 |
+| agent-research | stdin (claude -p) | 文档 | 补充文档、研究、设计 |
 
 ### 2.3 手动开发
 
