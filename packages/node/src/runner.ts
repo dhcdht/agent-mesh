@@ -77,23 +77,139 @@ export async function runNode(config: NodeConfig): Promise<void> {
 
     while (true) {
       try {
-        const [inbox, allTasks, channelHistory] = await Promise.all([
+        const [inbox, allTasks] = await Promise.all([
           client.listInbox(config.mesh.id, agentId, true),
           client.listPendingTasks(config.mesh.id, ""), 
-          client.listChannel(config.mesh.id).then(msgs => msgs.slice(-5))
         ]);
-
-        const chatContext = channelHistory
-          .map(m => `[${m.from}]: ${typeof m.payload === 'string' ? m.payload : (m.payload as any).text}`)
-          .join("\n");
 
         const unownedTasks = (allTasks as any[]).filter(t => !t.owner || t.owner === "");
         for (const task of unownedTasks) {
           try {
-            console.log(`[node:${config.node.id}] [agent:${agentId}] claiming task ${task.id}`);
             await client.claimTask(task.id, agentId);
           } catch {
           }
+        }
+
+        const taskSnapshot = (allTasks as any[])
+          .map(t => `- [${t.status}] ${t.id}: ${t.subject} (owner: ${t.owner})`)
+          .join("\n");
+
+        for (const message of inbox) {
+          if (message.from === agentId || message.from === "system") {
+            await client.markMessageRead(message.id, agentId);
+            continue;
+          }
+
+          const payload = message.payload as Record<string, unknown>;
+          const text = (payload?.text ?? payload?.summary ?? JSON.stringify(payload)) as string;
+          
+          const isFromUser = message.from === "user" || message.from === "lead";
+          const isDirectQuestion = message.type === "question" && message.to === agentId;
+          const shouldReply = text && !isStdinArgsOnly && (isFromUser || isDirectQuestion);
+
+          if (shouldReply) {
+            console.log(`[node:${config.node.id}] [agent:${agentId}] queuing reply to ${message.from}`);
+            try {
+              await globalLock.acquire();
+              console.log(`[node:${config.node.id}] [agent:${agentId}] executing reply...`);
+              const syntheticTask = {
+                id: `msg-${message.id}`,
+                meshId: config.mesh.id,
+                subject: `Reply to ${message.from}`,
+                description: `[RULES]\n1. ONLY reply if you have CODE or a CONCRETE PLAN.\n2. NO "OK" or "Forwarded" messages.\n3. Be concise.\n\n[CONTEXT]\nMembers: ${allAgentIds}\n\n[MESSAGE]\n${text}`,
+                status: "pending" as const,
+                owner: agentId,
+                repoId: repo.id,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              };
+              const result = await adapter.execute(syntheticTask);
+              await client.sendMessage({
+                id: randomUUID(),
+                meshId: config.mesh.id,
+                from: agentId,
+                to: BROADCAST_RECIPIENT,
+                type: "message",
+                payload: { text: result.summary, output: result.output },
+                taskId: message.taskId,
+              });
+            } catch (e) {
+              await client.sendMessage({
+                id: randomUUID(),
+                meshId: config.mesh.id,
+                from: agentId,
+                to: BROADCAST_RECIPIENT,
+                type: "message",
+                payload: { error: String(e) },
+                taskId: message.taskId,
+              });
+            } finally {
+              globalLock.release();
+            }
+          } else if (adapter.deliverMessage) {
+            await adapter.deliverMessage({
+              id: message.id,
+              from: message.from,
+              to: message.to,
+              type: message.type,
+              payload: message.payload,
+              taskId: message.taskId,
+            });
+          }
+          await client.markMessageRead(message.id, agentId);
+        }
+
+        const tasks = await client.listPendingTasks(config.mesh.id, agentId);
+        for (const task of tasks) {
+          try {
+            await client.markTaskStatus(task.id, "in_progress");
+            console.log(`[node:${config.node.id}] [agent:${agentId}] queuing task ${task.id}...`);
+            await globalLock.acquire();
+            console.log(`[node:${config.node.id}] [agent:${agentId}] executing task ${task.id}...`);
+            const result = await adapter.execute(task);
+            await client.markTaskStatus(task.id, "completed");
+            await client.sendMessage({
+              id: randomUUID(),
+              meshId: config.mesh.id,
+              from: agentId,
+              to: BROADCAST_RECIPIENT,
+              type: "done",
+              payload: { taskId: task.id, summary: result.summary, output: result.output },
+              taskId: task.id,
+            });
+          } catch (error) {
+            console.error(`[node:${config.node.id}] [agent:${agentId}] task failed ${task.id}`, error);
+            await client.sendMessage({
+              id: randomUUID(),
+              meshId: config.mesh.id,
+              from: agentId,
+              to: BROADCAST_RECIPIENT,
+              type: "failed",
+              payload: { taskId: task.id, error: String(error) },
+              taskId: task.id,
+            });
+          } finally {
+            globalLock.release();
+          }
+        }
+      } catch (e) {
+        console.error(`[node:${config.node.id}] [agent:${agentId}] loop error:`, e);
+      }
+
+      await sleep(config.node.pollIntervalMs);
+    }
+  };
+
+  const startHeartbeat = () => {
+    setInterval(() => {
+      client.heartbeat(config.node.id, config.mesh.id).catch(() => {});
+    }, 10000);
+  };
+
+  startHeartbeat();
+  await Promise.all(config.repos.map(runAgentLoop));
+}
+
         }
 
         const taskSnapshot = (allTasks as any[])
