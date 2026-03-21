@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { render, Box, Text, useApp, useInput, Newline } from "ink";
+import { render, Box, Text, useApp } from "ink";
 import TextInput from "ink-text-input";
 import { randomUUID } from "node:crypto";
 import * as http from "node:http";
@@ -81,7 +81,10 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
             try {
               const event = JSON.parse(line.slice(6));
               if (event.type === "message_created" && event.message) {
-                setMessages((prev) => [...prev, event.message]);
+                setMessages((prev) => {
+                  if (prev.some(m => m.id === event.message.id)) return prev;
+                  return [...prev, event.message];
+                });
               } else if (event.type.startsWith("task_") || event.type.startsWith("agent_")) {
                 refreshDashboard();
               }
@@ -140,8 +143,11 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
   const activeTasks = useMemo(() => tasks.filter((t) => t.status === "in_progress"), [tasks]);
   const onlineAgents = useMemo(() => agents.filter((a) => a.nodeOnline), [agents]);
 
+  const displayRows = process.stdout.rows || 24;
+  const messageRows = displayRows - 12;
+
   return (
-    <Box flexDirection="column" height={process.stdout.rows - 1}>
+    <Box flexDirection="column" height={displayRows - 1}>
       <Box borderStyle="round" borderColor="cyan" paddingX={1} flexDirection="column">
         <Box>
           <Text bold color="cyan">🤖 AGENT MESH | </Text>
@@ -161,7 +167,7 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
       </Box>
 
       <Box flexGrow={1} flexDirection="column" paddingX={1} marginTop={1}>
-        {messages.slice(-(process.stdout.rows - 12)).map((m, i) => {
+        {messages.slice(-messageRows).map((m, i) => {
           const payload = m.payload as any;
           const text = payload?.text ?? payload?.summary ?? payload?.error ?? JSON.stringify(payload);
           const isUser = m.from === USER_ID;
