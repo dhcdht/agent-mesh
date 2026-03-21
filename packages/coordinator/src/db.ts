@@ -142,10 +142,18 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       node_id=excluded.node_id,
       status=excluded.status
   `);
-  const listAgentsByMeshStmt = db.prepare("SELECT * FROM agents WHERE mesh_id = ?");
-  const listAgentsByMeshAndNodeStmt = db.prepare(
-    "SELECT * FROM agents WHERE mesh_id = ? AND node_id = ?"
-  );
+  const listAgentsByMeshStmt = db.prepare(`
+    SELECT a.*, n.status as node_status 
+    FROM agents a 
+    LEFT JOIN nodes n ON a.node_id = n.id 
+    WHERE a.mesh_id = ?
+  `);
+  const listAgentsByMeshAndNodeStmt = db.prepare(`
+    SELECT a.*, n.status as node_status 
+    FROM agents a 
+    LEFT JOIN nodes n ON a.node_id = n.id 
+    WHERE a.mesh_id = ? AND a.node_id = ?
+  `);
 
 const createTaskStmt = db.prepare(
   "INSERT INTO tasks (id, mesh_id, subject, description, status, owner, repo_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -242,6 +250,7 @@ const createTaskStmt = db.prepare(
       cliConfig: parseJson<Record<string, unknown>>(row.cli_config),
       nodeId: row.node_id ?? undefined,
       status: row.status,
+      nodeOnline: row.node_status === "online" || storage.isNodeOnline(row.node_id),
     };
   }
 
