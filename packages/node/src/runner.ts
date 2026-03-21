@@ -77,10 +77,15 @@ export async function runNode(config: NodeConfig): Promise<void> {
 
     while (true) {
       try {
-        const [inbox, allTasks] = await Promise.all([
+        const [inbox, allTasks, channelHistory] = await Promise.all([
           client.listInbox(config.mesh.id, agentId, true),
           client.listPendingTasks(config.mesh.id, ""), 
+          client.listChannel(config.mesh.id).then(msgs => msgs.slice(-5))
         ]);
+
+        const chatContext = channelHistory
+          .map(m => `[${m.from}]: ${typeof m.payload === 'string' ? m.payload : (m.payload as any).text}`)
+          .join("\n");
 
         const unownedTasks = (allTasks as any[]).filter(t => !t.owner || t.owner === "");
         for (const task of unownedTasks) {
@@ -123,7 +128,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
               id: `msg-${message.id}`,
               meshId: config.mesh.id,
               subject: `Reply to ${message.from}`,
-              description: `[TEAM CONTEXT]\nMembers: ${allAgentIds}\n\n[MESH STATUS]\n${taskSnapshot}\n\n[MESSAGE]\n${text}`,
+              description: `[RULES]\n1. ONLY reply if you have CODE or a CONCRETE PLAN.\n2. NO "OK" or "Forwarded" messages.\n3. Be concise.\n\n[CONTEXT]\nMembers: ${allAgentIds}\n\n[MESSAGE]\n${text}`,
               status: "pending" as const,
               owner: agentId,
               repoId: repo.id,
