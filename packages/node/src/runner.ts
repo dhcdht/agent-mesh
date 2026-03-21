@@ -8,6 +8,30 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+class ExecutionLock {
+  private queue: (() => void)[] = [];
+  private locked = false;
+
+  async acquire(): Promise<void> {
+    if (!this.locked) {
+      this.locked = true;
+      return;
+    }
+    return new Promise((resolve) => this.queue.push(resolve));
+  }
+
+  release(): void {
+    if (this.queue.length > 0) {
+      const next = this.queue.shift();
+      next?.();
+    } else {
+      this.locked = false;
+    }
+  }
+}
+
+const globalLock = new ExecutionLock();
+
 export async function runNode(config: NodeConfig): Promise<void> {
   const client = new CoordinatorClient({
     baseUrl: config.coordinator.url,
@@ -107,6 +131,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
               updatedAt: new Date().toISOString(),
             };
             try {
+              await globalLock.acquire();
               const result = await adapter.execute(syntheticTask);
               await client.sendMessage({
                 id: randomUUID(),
@@ -127,6 +152,8 @@ export async function runNode(config: NodeConfig): Promise<void> {
                 payload: { error: String(e) },
                 taskId: message.taskId,
               });
+            } finally {
+              globalLock.release();
             }
           } else if (adapter.deliverMessage) {
             await adapter.deliverMessage({
@@ -145,6 +172,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
         for (const task of tasks) {
           try {
             await client.markTaskStatus(task.id, "in_progress");
+            await globalLock.acquire();
             const result = await adapter.execute(task);
             await client.markTaskStatus(task.id, "completed");
             await client.sendMessage({
@@ -167,6 +195,8 @@ export async function runNode(config: NodeConfig): Promise<void> {
               payload: { taskId: task.id, error: String(error) },
               taskId: task.id,
             });
+          } finally {
+            globalLock.release();
           }
         }
       } catch (e) {
