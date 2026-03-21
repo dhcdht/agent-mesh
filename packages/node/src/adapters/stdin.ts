@@ -100,7 +100,11 @@ export class StdinAdapter implements AgentAdapter {
 
       proc.on("error", (err) => {
         clearTimeout(timeout);
-        reject(err);
+        if ((err as any).code === "ENOENT") {
+          reject(new Error(`Command not found: ${this.config.command}. Please ensure it is installed and in your PATH.`));
+        } else {
+          reject(err);
+        }
       });
 
       proc.stdin?.end();
