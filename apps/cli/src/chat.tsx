@@ -145,11 +145,11 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
   const onlineAgents = useMemo(() => agents.filter((a) => a.nodeOnline), [agents]);
 
   const displayRows = process.stdout.rows || 24;
-  const messageRows = displayRows - 12;
+  const messageRows = Math.max(5, displayRows - 15);
 
   return (
-    <Box flexDirection="column" height={displayRows - 1}>
-      <Box borderStyle="round" borderColor="cyan" paddingX={1} flexDirection="column">
+    <Box flexDirection="column" height={Math.max(10, displayRows - 1)}>
+      <Box borderStyle="round" borderColor="cyan" paddingX={1} flexDirection="column" flexShrink={0}>
         <Box>
           <Text bold color="cyan">🤖 AGENT MESH | </Text>
           <Text color="white">Mesh: {ctx.meshId} | </Text>

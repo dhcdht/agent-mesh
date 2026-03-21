@@ -84,9 +84,13 @@ export async function runNode(config: NodeConfig): Promise<void> {
           const payload = message.payload as Record<string, unknown>;
           const text = (payload?.text ?? payload?.summary ?? JSON.stringify(payload)) as string;
           const isChatType = message.type === "message" || message.type === "broadcast";
+          
+          const shouldReply = isChatType && text && !isStdinArgsOnly && (
+            message.from === "user" || (message.to === agentId && message.from !== "user")
+          );
 
-          if (isChatType && text && !isStdinArgsOnly) {
-            console.log(`[node:${config.node.id}] [agent:${agentId}] triggering synthetic task for message ${message.id}`);
+          if (shouldReply) {
+            console.log(`[node:${config.node.id}] [agent:${agentId}] replying to ${message.from}`);
             const syntheticTask = {
               id: `msg-${message.id}`,
               meshId: config.mesh.id,
