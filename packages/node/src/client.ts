@@ -31,21 +31,36 @@ export class CoordinatorClient {
       ...(init?.headers as Record<string, string> | undefined),
     };
 
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      ...init,
-      headers,
-    });
+    let lastError: any;
+    for (let i = 0; i < 15; i++) {
+      try {
+        const response = await fetch(`${this.baseUrl}${path}`, {
+          ...init,
+          headers,
+        });
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`HTTP ${response.status} ${path}: ${body}`);
+        if (!response.ok) {
+          const body = await response.text();
+          throw new Error(`HTTP ${response.status} ${path}: ${body}`);
+        }
+
+        if (response.status === 204) {
+          return undefined as T;
+        }
+
+        return (await response.json()) as T;
+      } catch (error) {
+        lastError = error;
+        const code = (error as any).code || (error as any).cause?.code;
+        if (code === "ECONNREFUSED") {
+          console.warn(`[node] Coordinator not ready at ${this.baseUrl}, retrying in 2s... (${i + 1}/15)`);
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          continue;
+        }
+        throw error;
+      }
     }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    return (await response.json()) as T;
+    throw lastError;
   }
 
   async ensureMesh(mesh: { id: string; name: string }): Promise<void> {
@@ -98,7 +113,7 @@ export class CoordinatorClient {
     return response.items;
   }
 
-  async markTaskStatus(taskId: string, status: "in_progress" | "completed"): Promise<void> {
+  async markTaskStatus(taskId: string, status: "pending" | "in_progress" | "completed" | "deleted"): Promise<void> {
     await this.request(`/api/v1/tasks/${taskId}`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
