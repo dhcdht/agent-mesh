@@ -83,11 +83,15 @@ export async function runNode(config: NodeConfig): Promise<void> {
 
           const payload = message.payload as Record<string, unknown>;
           const text = (payload?.text ?? payload?.summary ?? JSON.stringify(payload)) as string;
-          const isChatType = message.type === "message" || message.type === "broadcast";
           
-          const shouldReply = isChatType && text && !isStdinArgsOnly && (
-            message.from === "user" || (message.to === agentId && message.from !== "user")
-          );
+          // STRICT REPLY POLICY:
+          // 1. Always reply to User
+          // 2. Reply to other Agents ONLY if it is a specific "question" directed at us.
+          // 3. IGNORE "message" or "broadcast" from other agents to prevent loops.
+          const isFromUser = message.from === "user" || message.from === "lead";
+          const isDirectQuestion = message.type === "question" && message.to === agentId;
+          
+          const shouldReply = text && !isStdinArgsOnly && (isFromUser || isDirectQuestion);
 
           if (shouldReply) {
             console.log(`[node:${config.node.id}] [agent:${agentId}] replying to ${message.from}`);
