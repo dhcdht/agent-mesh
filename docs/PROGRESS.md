@@ -195,7 +195,23 @@ docker-compose up -d --scale node=5
 - 使用环境变量 `COORDINATOR_DB_PATH` 指定绝对路径
 - 或直接指定路径启动：`COORDINATOR_DB_PATH=/path/to/db pnpm coordinator`
 
-## 四、当前架构图
+## 四、下一步规划：自举开发 2.0（2025-03 下旬）
+
+### 目标：从“人工触发”转向“自主编排”
+
+#### 1. 架构师 Agent (Self-Orchestration)
+- **核心逻辑**：为 `agent-coordinator` 赋予创建任务的 Tool 权限。
+- **工作流**：User 指令 -> 架构师拆解 -> 自动创建 Task -> 专家 Agent 领活。
+
+#### 2. 跨仓库能力增强 (Cross-Repo Tools)
+- **Mesh Search**：允许 Agent 跨节点搜索代码模式。
+- **Dependency Tracking**：自动识别跨模块的 API 变更影响。
+
+#### 3. 质量闭环 (QA Automation)
+- **Reviewer 机制**：任务完成后自动触发同行评审（Peer Review）。
+- **自动化冒烟测试**：集成 `agent-tester` 到任务生命周期。
+
+## 五、当前架构图
 
 ```
                     ┌─────────────────────────────────────────────────┐
