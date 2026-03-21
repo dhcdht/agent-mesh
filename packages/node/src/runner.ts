@@ -48,11 +48,19 @@ export async function runNode(config: NodeConfig): Promise<void> {
     const adapter = adapters.get(agentId)!;
     const isStdinArgsOnly =
       repo.agent.cliType === "stdin" && (repo.agent.cliConfig as { argsOnly?: boolean })?.argsOnly === true;
+    
+    // 获取当前 Mesh 的所有 Agent ID，用于提供上下文
+    const allAgentIds = config.repos.map(r => r.agent.id).join(", ");
 
     while (true) {
       try {
         const inbox = await client.listInbox(config.mesh.id, agentId, true);
         for (const message of inbox) {
+          if (message.from === agentId) {
+            await client.markMessageRead(message.id, agentId);
+            continue;
+          }
+
           console.log(
             `[node:${config.node.id}] [agent:${agentId}] inbox <- ${message.from} (${message.type})`
           );
@@ -66,7 +74,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
               id: `msg-${message.id}`,
               meshId: config.mesh.id,
               subject: `Reply to ${message.from}`,
-              description: text,
+              description: `[TEAM CONTEXT] Members: ${allAgentIds}\n\n${text}`,
               status: "pending" as const,
               owner: agentId,
               repoId: repo.id,

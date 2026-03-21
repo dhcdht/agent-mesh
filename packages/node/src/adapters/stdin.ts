@@ -41,10 +41,16 @@ export class StdinAdapter implements AgentAdapter {
 
   async execute(task: Task): Promise<AdapterExecutionResult> {
     const baseArgs = this.config.args ?? [];
-    let promptText = `${task.subject}\n\n${task.description}`;
+    
+    // 构建增强的身份与团队上下文
+    let identityContext = `[IDENTITY]\n`;
+    identityContext += `You are '${this.agentId}'. Your primary responsibility is the codebase at: ${this.config.cwd || "current directory"}.\n`;
+    identityContext += `You are part of a distributed team in 'Agent Mesh'.\n\n`;
+    
+    let promptText = `${identityContext}[TASK]\n${task.subject}\n\n${task.description}`;
     
     if (this.pendingMessages.length > 0) {
-      promptText += "\n\nRecent team messages:\n";
+      promptText += "\n\n[TEAM MESSAGES]\n";
       this.pendingMessages.forEach((msg, idx) => {
         let payloadStr = "";
         if (typeof msg.payload === "string") {
