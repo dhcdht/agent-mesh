@@ -73,6 +73,7 @@ export interface CoordinatorStorage {
   updateTask(taskId: string, patch: UpdateTaskInput): Task | undefined;
   getTask(taskId: string): Task | undefined;
   listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[];
+  claimTask(taskId: string, agentId: string): Task | undefined;
 
   createMessage(input: CreateMessageInput): Message;
   listInbox(params: { meshId: string; agentId: string; unreadOnly: boolean }): Message[];

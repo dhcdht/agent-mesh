@@ -94,6 +94,8 @@ function renderDashboard(tasks: TaskSummary[], agents: AgentSummary[]): void {
   process.stdout.write("\x1b[u");
 }
 
+import * as http from "node:http";
+
 async function fetchChannel(ctx: ChatContext, since?: string): Promise<ChannelMessage[]> {
   const q = since ? `?since=${encodeURIComponent(since)}` : "";
   const res = await ctx.client.request<{ items: ChannelMessage[] }>(
@@ -101,6 +103,36 @@ async function fetchChannel(ctx: ChatContext, since?: string): Promise<ChannelMe
     `/api/v1/meshes/${encodeURIComponent(ctx.meshId)}/channel${q}`
   );
   return res.items ?? [];
+}
+
+async function listenEvents(ctx: ChatContext, onMessage: (m: ChannelMessage) => void, onRefresh: () => void): Promise<void> {
+  const url = `${ctx.baseUrl}/api/v1/events?meshId=${encodeURIComponent(ctx.meshId)}`;
+  
+  const req = http.get(url, (res) => {
+    let buffer = "";
+    res.on("data", (chunk) => {
+      buffer += chunk.toString();
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const event = JSON.parse(line.slice(6));
+            if (event.type === "message_created" && event.message) {
+              onMessage(event.message);
+            } else if (event.type === "task_created" || event.type === "task_updated") {
+              onRefresh();
+            }
+          } catch (e) {}
+        }
+      }
+    });
+  });
+  
+  req.on("error", () => {
+    setTimeout(() => listenEvents(ctx, onMessage, onRefresh), 5000);
+  });
 }
 
 async function sendMessage(ctx: ChatContext, to: string, text: string, taskId?: string): Promise<void> {
@@ -194,11 +226,9 @@ export async function runChat(ctx: ChatContext): Promise<void> {
   const doClose = (): void => {
     if (closed) return;
     closed = true;
-    if (pollTimer) clearInterval(pollTimer);
     try {
       rl.close();
     } catch {
-      // ignore
     }
     process.exit(0);
   };
@@ -207,51 +237,47 @@ export async function runChat(ctx: ChatContext): Promise<void> {
     for (const m of items) {
       if (lastSeenIds.has(m.id)) continue;
       lastSeenIds.add(m.id);
-      console.log(formatMessage(m));
+      
+      const formatted = formatMessage(m);
+      if (m.from !== USER_ID) {
+        simulateTyping(formatted);
+      } else {
+        console.log(formatted);
+      }
+      
       if (m.timestamp) lastSeenTimestamp = m.timestamp;
     }
   };
 
-  console.log(`\n  Agent Mesh 群聊 — mesh: ${ctx.meshId}`);
-  console.log("  lead + agents 共享消息流，/help 查看命令\n");
-
-  // 初始加载历史
-  try {
-    const history = await fetchChannel(ctx);
-    if (history.length > 0) {
-      displayMessages(history);
-      console.log("");
+  async function simulateTyping(text: string) {
+    const chars = text.split("");
+    for (const char of chars) {
+      process.stdout.write(char);
+      await new Promise(r => setTimeout(r, 5));
     }
-  } catch {
-    // 忽略
+    process.stdout.write("\n");
+    if (!closed) rl.prompt();
   }
 
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
+  console.log(`\n  Agent Mesh 群聊 — mesh: ${ctx.meshId}`);
+  console.log("  user + agents 共享实时消息流，/help 查看命令\n");
 
-  const poll = async (): Promise<void> => {
-    if (closed) return;
-    try {
-      const [messages, tasks, agents] = await Promise.all([
-        fetchChannel(ctx, lastSeenTimestamp),
-        fetchTasks(ctx),
-        fetchAgents(ctx),
-      ]);
-      
-      if (closed) return;
-      renderDashboard(tasks, agents);
-      
-      if (messages.length > 0) {
-        displayMessages(messages);
-        if (!closed) rl.prompt();
-      }
-    } catch {
-    }
-  };
+  try {
+    const history = await fetchChannel(ctx);
+    displayMessages(history);
+    
+    const refreshDashboard = async () => {
+      const [t, a] = await Promise.all([fetchTasks(ctx), fetchAgents(ctx)]);
+      renderDashboard(t, a);
+    };
 
-  pollTimer = setInterval(poll, POLL_INTERVAL_MS);
-  
-  process.stdout.write("\n".repeat(DASHBOARD_LINES));
-  poll();
+    listenEvents(ctx, (msg) => {
+      displayMessages([msg]);
+    }, refreshDashboard);
+    
+    await refreshDashboard();
+  } catch {
+  }
 
   const prompt = (): void => {
     if (closed) return;

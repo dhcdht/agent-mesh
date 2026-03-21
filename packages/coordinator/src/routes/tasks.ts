@@ -40,6 +40,22 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
     return reply.send(updated);
   });
 
+  app.post("/tasks/:taskId/claim", async (request, reply) => {
+    const { taskId } = request.params as { taskId: string };
+    const { agentId } = request.body as { agentId: string };
+    if (!agentId) {
+      return reply.code(400).send({ error: "agentId is required" });
+    }
+
+    const task = app.storage.claimTask(taskId, agentId);
+    if (!task) {
+      return reply.code(409).send({ error: "task already claimed or not found" });
+    }
+
+    app.eventBus.emit({ type: "task.updated", meshId: task.meshId, task });
+    return reply.send(task);
+  });
+
   app.get("/tasks", async (request, reply) => {
     const { meshId, owner, status } = request.query as {
       meshId?: string;

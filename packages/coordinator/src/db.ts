@@ -158,6 +158,9 @@ const createTaskStmt = db.prepare(
   const updateTaskStmt = db.prepare(
     "UPDATE tasks SET subject = ?, description = ?, status = ?, owner = ?, repo_id = ?, updated_at = ? WHERE id = ?"
   );
+  const claimTaskStmt = db.prepare(
+    "UPDATE tasks SET owner = ?, status = 'in_progress', updated_at = ? WHERE id = ? AND (owner = '' OR owner IS NULL) AND status = 'pending'"
+  );
 
   const createMessageStmt = db.prepare(
     "INSERT INTO messages (id, mesh_id, sender, recipient, type, payload, timestamp, is_read, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
@@ -405,18 +408,28 @@ updateTask(taskId: string, patch: UpdateTaskInput): Task | undefined {
   return next;
 },
 
-listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] {
-  const rows = listTasksByFilterStmt.all(
-    filters.meshId,
-    filters.owner ?? null,
-    filters.owner ?? null,
-    filters.status ?? null,
-    filters.status ?? null
-  );
-  return rows.map(mapTask);
-},
+  listTasks(filters: { meshId: string; owner?: string; status?: string }): Task[] {
+    const rows = listTasksByFilterStmt.all(
+      filters.meshId,
+      filters.owner ?? null,
+      filters.owner ?? null,
+      filters.status ?? null,
+      filters.status ?? null
+    );
+    return rows.map(mapTask);
+  },
+
+  claimTask(taskId: string, agentId: string): Task | undefined {
+    const now = nowIso();
+    const result = claimTaskStmt.run(agentId, now, taskId);
+    if ((result as { changes: number }).changes > 0) {
+      return storage.getTask(taskId);
+    }
+    return undefined;
+  },
 
   createMessage(input: CreateMessageInput): Message {
+
     const message: Message = {
       id: input.id,
       meshId: input.meshId,

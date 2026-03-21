@@ -55,8 +55,17 @@ export async function runNode(config: NodeConfig): Promise<void> {
       try {
         const [inbox, allTasks] = await Promise.all([
           client.listInbox(config.mesh.id, agentId, true),
-          client.listPendingTasks(config.mesh.id, "" as any).catch(() => []), 
+          client.listPendingTasks(config.mesh.id, ""), 
         ]);
+
+        const unownedTasks = (allTasks as any[]).filter(t => !t.owner || t.owner === "");
+        for (const task of unownedTasks) {
+          try {
+            console.log(`[node:${config.node.id}] [agent:${agentId}] claiming task ${task.id}`);
+            await client.claimTask(task.id, agentId);
+          } catch {
+          }
+        }
 
         const taskSnapshot = (allTasks as any[])
           .map(t => `- [${t.status}] ${t.id}: ${t.subject} (owner: ${t.owner})`)

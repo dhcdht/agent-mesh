@@ -105,6 +105,13 @@ export class CoordinatorClient {
     });
   }
 
+  async claimTask(taskId: string, agentId: string): Promise<Task> {
+    return this.request<Task>(`/api/v1/tasks/${encodeURIComponent(taskId)}/claim`, {
+      method: "POST",
+      body: JSON.stringify({ agentId }),
+    });
+  }
+
   async listInbox(
     meshId: string,
     agentId: string,
