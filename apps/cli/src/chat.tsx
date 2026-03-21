@@ -80,13 +80,13 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
           if (line.startsWith("data: ")) {
             try {
               const event = JSON.parse(line.slice(6));
-              if (event.type === "message_created" && event.message) {
+              if (event.type === "message.created" && event.message) {
                 setMessages((prev) => {
                   if (prev.some(m => m.id === event.message.id)) return prev;
                   const next = [...prev, event.message];
                   return next.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
                 });
-              } else if (event.type.startsWith("task_") || event.type.startsWith("agent_")) {
+              } else if (event.type.startsWith("task.") || event.type.startsWith("agent.")) {
                 refreshDashboard();
               }
             } catch (e) {}
@@ -119,8 +119,20 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
     }
 
     try {
+      const msgId = randomUUID();
+      const newMsg: ChannelMessage = {
+        id: msgId,
+        from: USER_ID,
+        to,
+        type: "message",
+        payload: { text: messageText },
+        timestamp: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, newMsg]);
+
       await ctx.client.request("POST", "/api/v1/messages", {
-        id: randomUUID(),
+        id: msgId,
         meshId: ctx.meshId,
         from: USER_ID,
         to,
@@ -146,6 +158,7 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
 
   const displayRows = process.stdout.rows || 24;
   const messageRows = Math.max(5, displayRows - 15);
+  const visibleMessages = messages.slice(Math.max(0, messages.length - messageRows));
 
   return (
     <Box flexDirection="column" height={Math.max(10, displayRows - 1)}>
@@ -168,7 +181,7 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
       </Box>
 
       <Box flexGrow={1} flexDirection="column" paddingX={1} marginTop={1} minHeight={10}>
-        {messages.slice(-messageRows).map((m, i) => {
+        {visibleMessages.map((m, i) => {
           const payload = m.payload as any;
           const text = payload?.text ?? payload?.summary ?? payload?.error ?? JSON.stringify(payload);
           const isUser = m.from === USER_ID;
