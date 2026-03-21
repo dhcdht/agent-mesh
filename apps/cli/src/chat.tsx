@@ -41,6 +41,7 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [agents, setAgents] = useState<AgentSummary[]>([]);
   const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const { exit } = useApp();
 
   const refreshDashboard = useCallback(async () => {
@@ -97,9 +98,10 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
 
   const handleSubmit = async (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || isSending) return;
     if (trimmed === "/quit" || trimmed === "/exit") exit();
 
+    setIsSending(true);
     let to = "*";
     let messageText = trimmed;
     if (trimmed.startsWith("@")) {
@@ -122,7 +124,17 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
         payload: { text: messageText },
       });
       setInput("");
-    } catch (e) {}
+    } catch (e) {
+      setMessages(prev => [...prev, {
+        id: randomUUID(),
+        from: "system",
+        to: USER_ID,
+        type: "error",
+        payload: { error: `发送失败: ${String(e)}` }
+      }]);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const activeTasks = useMemo(() => tasks.filter((t) => t.status === "in_progress"), [tasks]);
@@ -166,9 +178,14 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
         })}
       </Box>
 
-      <Box borderStyle="single" borderColor="gray" paddingX={1}>
-        <Text bold color="green">{"> "} </Text>
-        <TextInput value={input} onChange={setInput} onSubmit={handleSubmit} />
+      <Box borderStyle="single" borderColor={isSending ? "yellow" : "gray"} paddingX={1}>
+        <Text bold color="green">{isSending ? "⧖ " : "> "} </Text>
+        <TextInput 
+          value={input} 
+          onChange={setInput} 
+          onSubmit={handleSubmit} 
+          showCursor={!isSending}
+        />
       </Box>
     </Box>
   );
