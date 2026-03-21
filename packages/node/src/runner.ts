@@ -49,12 +49,19 @@ export async function runNode(config: NodeConfig): Promise<void> {
     const isStdinArgsOnly =
       repo.agent.cliType === "stdin" && (repo.agent.cliConfig as { argsOnly?: boolean })?.argsOnly === true;
     
-    // 获取当前 Mesh 的所有 Agent ID，用于提供上下文
     const allAgentIds = config.repos.map(r => r.agent.id).join(", ");
 
     while (true) {
       try {
-        const inbox = await client.listInbox(config.mesh.id, agentId, true);
+        const [inbox, allTasks] = await Promise.all([
+          client.listInbox(config.mesh.id, agentId, true),
+          client.listPendingTasks(config.mesh.id, "" as any).catch(() => []), 
+        ]);
+
+        const taskSnapshot = (allTasks as any[])
+          .map(t => `- [${t.status}] ${t.id}: ${t.subject} (owner: ${t.owner})`)
+          .join("\n");
+
         for (const message of inbox) {
           if (message.from === agentId) {
             await client.markMessageRead(message.id, agentId);
@@ -74,7 +81,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
               id: `msg-${message.id}`,
               meshId: config.mesh.id,
               subject: `Reply to ${message.from}`,
-              description: `[TEAM CONTEXT] Members: ${allAgentIds}\n\n${text}`,
+              description: `[TEAM CONTEXT]\nMembers: ${allAgentIds}\n\n[MESH STATUS]\n${taskSnapshot}\n\n[MESSAGE]\n${text}`,
               status: "pending" as const,
               owner: agentId,
               repoId: repo.id,

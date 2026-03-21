@@ -16,7 +16,7 @@ import * as readline from "node:readline";
 import { randomUUID } from "node:crypto";
 import type { CliClient } from "./client.js";
 
-const LEAD_ID = "lead";
+const USER_ID = "user";
 const POLL_INTERVAL_MS = 3000;
 const DASHBOARD_LINES = 6;
 
@@ -54,7 +54,7 @@ function formatMessage(m: ChannelMessage): string {
   const payload = m.payload as Record<string, unknown>;
   const text = payload?.text ?? payload?.summary ?? payload?.error ?? JSON.stringify(payload);
   const taskTag = m.taskId ? ` [task:${m.taskId}]` : "";
-  const sender = m.from === LEAD_ID ? "\x1b[32m你\x1b[39m" : `\x1b[34m${m.from}\x1b[39m`;
+  const sender = m.from === USER_ID ? "\x1b[32m你\x1b[39m" : `\x1b[34m${m.from}\x1b[39m`;
   return `  \x1b[90m${ts}\x1b[39m ${sender}: ${String(text).slice(0, 300)}${taskTag ? ` \x1b[90m${taskTag}\x1b[39m` : ""}`;
 }
 
@@ -107,7 +107,7 @@ async function sendMessage(ctx: ChatContext, to: string, text: string, taskId?: 
   await ctx.client.request("POST", "/api/v1/messages", {
     id: randomUUID(),
     meshId: ctx.meshId,
-    from: LEAD_ID,
+    from: USER_ID,
     to,
     type: "message",
     payload: { text },
