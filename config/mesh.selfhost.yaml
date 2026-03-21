@@ -1,6 +1,3 @@
-# Agent Mesh 自举配置：模拟真实开发团队
-# 不同 Agent 负责不同模块，通过分布式协作推进项目
-
 mesh:
   id: agent-mesh-dev
   name: Agent Mesh 核心团队
@@ -11,11 +8,8 @@ repos:
     agent:
       id: agent-coordinator
       name: Coordinator 专家
-      cliType: stdin
-      cliConfig:
-        command: claude
-        args: ["-p"]
-        timeoutMs: 300000
+      cliType: noop
+      cliConfig: {}
 
   - id: repo-node
     path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/node
@@ -26,34 +20,28 @@ repos:
       cliConfig:
         command: claude
         args: ["-p"]
-        timeoutMs: 300000
+        timeoutMs: 600000
 
   - id: repo-cli
     path: /Users/dhcdht/Desktop/Projects/agent-mesh/apps/cli
     agent:
       id: agent-cli
       name: CLI 体验专家
-      cliType: stdin
-      cliConfig:
-        command: claude
-        args: ["-p"]
-        timeoutMs: 300000
+      cliType: noop
+      cliConfig: {}
 
   - id: repo-shared
     path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/shared
     agent:
       id: agent-shared
       name: 架构师 (Shared)
-      cliType: stdin
-      cliConfig:
-        command: claude
-        args: ["-p"]
-        timeoutMs: 300000
+      cliType: noop
+      cliConfig: {}
 
 coordinator:
   url: http://localhost:3000
   apiKey:
 
 node:
-  id: ${MESH_NODE_ID:-node-selfhost}
-  pollIntervalMs: 3000
+  id: node-selfhost
+  pollIntervalMs: 2000
