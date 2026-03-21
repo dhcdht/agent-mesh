@@ -167,7 +167,7 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
         )}
       </Box>
 
-      <Box flexGrow={1} flexDirection="column" paddingX={1} marginTop={1}>
+      <Box flexGrow={1} flexDirection="column" paddingX={1} marginTop={1} minHeight={10}>
         {messages.slice(-messageRows).map((m, i) => {
           const payload = m.payload as any;
           const text = payload?.text ?? payload?.summary ?? payload?.error ?? JSON.stringify(payload);
@@ -175,11 +175,15 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
           const ts = m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : "";
           
           return (
-            <Box key={m.id || i}>
-              <Text color="gray">{ts} </Text>
-              <Text color={isUser ? "green" : "blue"} bold>{isUser ? "你" : m.from}: </Text>
-              <Text color={payload?.error ? "red" : "white"}>{String(text).slice(0, 500)}</Text>
-              {m.taskId && <Text color="gray"> [task:{m.taskId}]</Text>}
+            <Box key={m.id || i} flexDirection="column" marginBottom={1}>
+              <Box>
+                <Text color="gray">{ts} </Text>
+                <Text color={isUser ? "green" : "blue"} bold>{isUser ? "你" : m.from}: </Text>
+              </Box>
+              <Box paddingLeft={2}>
+                <Text color={payload?.error ? "red" : "white"}>{String(text)}</Text>
+              </Box>
+              {m.taskId && <Text color="gray">  └─ task: {m.taskId}</Text>}
             </Box>
           );
         })}

@@ -86,6 +86,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
           const isChatType = message.type === "message" || message.type === "broadcast";
 
           if (isChatType && text && !isStdinArgsOnly) {
+            console.log(`[node:${config.node.id}] [agent:${agentId}] triggering synthetic task for message ${message.id}`);
             const syntheticTask = {
               id: `msg-${message.id}`,
               meshId: config.mesh.id,
