@@ -42,10 +42,8 @@ export class StdinAdapter implements AgentAdapter {
   async execute(task: Task): Promise<AdapterExecutionResult> {
     const baseArgs = this.config.args ?? [];
     
-    // 构建增强的身份与团队上下文
-    let identityContext = `[IDENTITY]\n`;
-    identityContext += `You are '${this.agentId}'. Your primary responsibility is the codebase at: ${this.config.cwd || "current directory"}.\n`;
-    identityContext += `You are part of a distributed team in 'Agent Mesh'.\n\n`;
+    let identityContext = `[IDENTITY]\nYou are ${this.agentId}.\n`;
+    identityContext += `Responsibility: ${this.config.cwd || "current directory"}.\n\n`;
     
     let promptText = `${identityContext}[TASK]\n${task.subject}\n\n${task.description}`;
     

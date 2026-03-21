@@ -72,7 +72,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
           .join("\n");
 
         for (const message of inbox) {
-          if (message.from === agentId) {
+          if (message.from === agentId || message.from === "system") {
             await client.markMessageRead(message.id, agentId);
             continue;
           }

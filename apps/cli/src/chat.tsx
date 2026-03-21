@@ -83,7 +83,8 @@ const ChatApp = ({ ctx }: { ctx: ChatContext }) => {
               if (event.type === "message_created" && event.message) {
                 setMessages((prev) => {
                   if (prev.some(m => m.id === event.message.id)) return prev;
-                  return [...prev, event.message];
+                  const next = [...prev, event.message];
+                  return next.sort((a, b) => (a.timestamp || "").localeCompare(b.timestamp || ""));
                 });
               } else if (event.type.startsWith("task_") || event.type.startsWith("agent_")) {
                 refreshDashboard();
