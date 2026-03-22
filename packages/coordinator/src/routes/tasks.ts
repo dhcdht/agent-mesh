@@ -21,6 +21,15 @@ export async function registerTaskRoutes(app: FastifyInstance): Promise<void> {
     }
   });
 
+  app.get("/tasks/:taskId", async (request, reply) => {
+    const { taskId } = request.params as { taskId: string };
+    const task = app.storage.getTask(taskId);
+    if (!task) {
+      return reply.code(404).send({ error: "task not found" });
+    }
+    return reply.send(task);
+  });
+
   app.patch("/tasks/:taskId", async (request, reply) => {
     const { taskId } = request.params as { taskId: string };
     const parsed = updateTaskSchema.safeParse(request.body);

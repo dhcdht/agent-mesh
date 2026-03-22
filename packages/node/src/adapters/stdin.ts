@@ -44,7 +44,9 @@ export class StdinAdapter implements AgentAdapter {
     let identityContext = `[IDENTITY]\nYou are ${this.agentId}.\n`;
     identityContext += `Responsibility: ${this.config.cwd || "current directory"}.\n\n`;
     
-    let promptText = `${identityContext}[TASK]\n${task.subject}\n\n${task.description}`;
+    let promptText = `${identityContext}[TOOLS]\nYou have 'mesh-edit' in PATH. Use it for ALL file/git operations to avoid interactive prompts.\n`;
+    promptText += `  mesh-edit read path=<file>\n  mesh-edit write path=<file> content=<text>\n  mesh-edit edit path=<file> old=<text> new=<text>\n  mesh-edit git-commit message=<msg>\n\n`;
+    promptText += `[TASK]\n${task.subject}\n\n${task.description}`;
     
     if (this.pendingMessages.length > 0) {
       promptText += "\n\n[TEAM MESSAGES (RECENT)]\n";
