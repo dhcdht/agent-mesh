@@ -8,17 +8,21 @@ repos:
     agent:
       id: agent-coordinator
       name: Coordinator 专家
-      cliType: acp-pool
+      cliType: stdin
       cliConfig:
-        command: opencode
-        args: ["acp"]
+        command: claude
+        args: ["-p"]
         timeoutMs: 600000
+        env:
+          CLAUDE_CODE_FORCE_ACCEPT: "1"
+          NON_INTERACTIVE: "true"
+          CI: "true"
 
   - id: repo-node
     path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/node
     agent:
       id: agent-node
-      name: Node 专家
+      name: Node 运行时专家
       cliType: noop
       cliConfig: {}
 

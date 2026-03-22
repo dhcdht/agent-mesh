@@ -103,11 +103,9 @@ class AcpProcess {
 
   private async initialize(): Promise<void> {
     const result = await this.sendRequest("initialize", {
-      protocolVersion: 1,
-      clientCapabilities: {
-        fs: { readTextFile: true, writeTextFile: true },
-        terminal: true,
-      },
+      protocolVersion: "1",
+      version: "0.1.0",
+      clientCapabilities: null,
       clientInfo: { name: "agent-mesh", title: "Agent Mesh", version: "0.1.0" },
     });
 
