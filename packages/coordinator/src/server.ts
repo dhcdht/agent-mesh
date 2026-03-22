@@ -13,6 +13,7 @@ import { registerMeshRoutes } from "./routes/meshes.js";
 import { registerMessageRoutes } from "./routes/messages.js";
 import { registerNodeRoutes } from "./routes/nodes.js";
 import { registerRepoRoutes } from "./routes/repos.js";
+import { registerPingRoutes } from "./routes/ping.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -72,6 +73,7 @@ export async function buildServer(dbPath: string): Promise<FastifyInstance> {
       await registerTaskRoutes(api);
       await registerMessageRoutes(api);
       await registerEventRoutes(api);
+      await registerPingRoutes(api);
     },
     { prefix: "/api/v1" }
   );
