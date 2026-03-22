@@ -255,6 +255,7 @@ export class AcpAdapter implements AgentAdapter {
       proc.on("spawn", () => {
         sendRequest("initialize", {
           protocolVersion: 1,
+          version: "0.1.0",
           clientCapabilities: {
             fs: { readTextFile: true, writeTextFile: true },
             terminal: true,
