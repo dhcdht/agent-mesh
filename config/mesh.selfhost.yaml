@@ -3,21 +3,16 @@ mesh:
   name: Agent Mesh 核心团队
 
 repos:
-  - id: repo-coordinator
-    path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/coordinator
-    agent:
-      id: agent-coordinator
-      name: Coordinator 专家
-      cliType: noop
-      cliConfig: {}
-
-  - id: repo-node
-    path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/node
+  - id: repo-core
+    path: /Users/dhcdht/Desktop/Projects/agent-mesh
     agent:
       id: agent-node
       name: Node 运行时专家
-      cliType: pi-agent
-      cliConfig: {}
+      cliType: stdin
+      cliConfig:
+        command: node
+        args: ["/Users/dhcdht/Desktop/Projects/agent-mesh/bin/agent-executor.js"]
+        timeoutMs: 30000
 
 coordinator:
   url: http://localhost:3000
