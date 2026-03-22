@@ -22,11 +22,9 @@ export async function registerMessageRoutes(app: FastifyInstance): Promise<void>
     const isBroadcast = BROADCAST_ALIASES.includes(to);
 
     if (isBroadcast) {
-      // 群聊：广播存单条，to="*"，所有人通过 channel 或 inbox 可见
       const m = app.storage.createMessage({
         ...parsed.data,
         to: BROADCAST_RECIPIENT,
-        type: parsed.data.type === "message" ? "broadcast" : parsed.data.type,
       } as CreateMessageInput);
       app.eventBus.emit({ type: "message.created", meshId: parsed.data.meshId, message: m });
       return reply.code(201).send({ broadcast: true, message: m });

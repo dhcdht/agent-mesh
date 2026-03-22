@@ -13,20 +13,28 @@ class ExecutionLock {
   private queue: (() => void)[] = [];
   private locked = false;
 
-  async acquire(): Promise<void> {
+  async acquire(agentId: string): Promise<void> {
+    console.log(`[LOCK] agent:${agentId} requesting lock (currently ${this.locked ? 'LOCKED' : 'FREE'})`);
     if (!this.locked) {
       this.locked = true;
+      console.log(`[LOCK] agent:${agentId} acquired lock immediately.`);
       return;
     }
-    return new Promise((resolve) => this.queue.push(resolve));
+    return new Promise((resolve) => {
+      console.log(`[LOCK] agent:${agentId} added to queue.`);
+      this.queue.push(resolve);
+    });
   }
 
-  release(): void {
+  release(agentId: string): void {
+    console.log(`[LOCK] agent:${agentId} releasing lock.`);
     if (this.queue.length > 0) {
       const next = this.queue.shift();
+      console.log(`[LOCK] transferring lock to next agent in queue.`);
       next?.();
     } else {
       this.locked = false;
+      console.log(`[LOCK] lock is now FREE.`);
     }
   }
 }
@@ -116,12 +124,12 @@ export async function runNode(config: NodeConfig): Promise<void> {
           
           const isFromUser = message.from === "user" || message.from === "lead";
           const isDirectQuestion = message.type === "question" && message.to === agentId;
-          const shouldReply = text && !isStdinArgsOnly && (isFromUser || isDirectQuestion);
+          const shouldReply = false && text && !isStdinArgsOnly && (isFromUser || isDirectQuestion);
 
           if (shouldReply) {
             console.log(`[node] agent:${agentId} replying...`);
             try {
-              await globalLock.acquire();
+              await globalLock.acquire(agentId);
               const syntheticTask = {
                 id: `msg-${message.id}`,
                 meshId: config.mesh.id,
@@ -154,7 +162,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
                 taskId: message.taskId,
               });
             } finally {
-              globalLock.release();
+              globalLock.release(agentId);
             }
           }
           await client.markMessageRead(message.id, agentId);
@@ -164,7 +172,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
         for (const task of tasks) {
           try {
             await client.markTaskStatus(task.id, "in_progress");
-            await globalLock.acquire();
+            await globalLock.acquire(agentId);
             const result = await adapter.execute(task);
             await client.markTaskStatus(task.id, "completed");
             await client.sendMessage({
@@ -189,10 +197,10 @@ export async function runNode(config: NodeConfig): Promise<void> {
               taskId: task.id,
             });
           } finally {
-
-            globalLock.release();
+            globalLock.release(agentId);
           }
         }
+
       } catch (e) {}
       await sleep(config.node.pollIntervalMs);
     }

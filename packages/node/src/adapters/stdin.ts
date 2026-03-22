@@ -48,8 +48,9 @@ export class StdinAdapter implements AgentAdapter {
     let promptText = `${identityContext}[TASK]\n${task.subject}\n\n${task.description}`;
     
     if (this.pendingMessages.length > 0) {
-      promptText += "\n\n[TEAM MESSAGES]\n";
-      this.pendingMessages.forEach((msg, idx) => {
+      promptText += "\n\n[TEAM MESSAGES (RECENT)]\n";
+      const recentMessages = this.pendingMessages.slice(-10);
+      recentMessages.forEach((msg, idx) => {
         let payloadStr = "";
         if (typeof msg.payload === "string") {
           payloadStr = msg.payload;
@@ -60,7 +61,7 @@ export class StdinAdapter implements AgentAdapter {
             payloadStr = String(msg.payload);
           }
         }
-        promptText += `${idx + 1}. [${msg.from} -> ${msg.to}] (${msg.type}): ${payloadStr}\n`;
+        promptText += `Message ${idx + 1}: From ${msg.from} to ${msg.to} (${msg.type})\nContent: ${payloadStr.slice(0, 2000)}\n\n`;
       });
       this.pendingMessages = [];
     }
@@ -78,7 +79,10 @@ export class StdinAdapter implements AgentAdapter {
 
       const chunks: Buffer[] = [];
       proc.stdout?.on("data", (chunk: Buffer) => chunks.push(chunk));
-      proc.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
+      proc.stderr?.on("data", (chunk: Buffer) => {
+        console.error(`[AGENT:${this.agentId}:STDERR] ${chunk.toString()}`);
+        chunks.push(chunk);
+      });
 
       const timeout = setTimeout(() => {
         proc.kill("SIGTERM");

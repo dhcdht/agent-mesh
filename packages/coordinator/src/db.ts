@@ -166,11 +166,9 @@ const createTaskStmt = db.prepare(
   const updateTaskStmt = db.prepare(
     "UPDATE tasks SET subject = ?, description = ?, status = ?, owner = ?, repo_id = ?, updated_at = ? WHERE id = ?"
   );
-  const claimTaskStmt = db.prepare(`
-    UPDATE tasks 
-    SET owner = ?, status = 'in_progress', updated_at = ? 
-    WHERE id = ? AND (owner = '' OR owner IS NULL) AND status = 'pending'
-  `);
+  const claimTaskStmt = db.prepare(
+    "UPDATE tasks SET owner = ?, status = 'in_progress', updated_at = ? WHERE id = ? AND (owner = '' OR owner IS NULL) AND status = 'pending'"
+  );
 
   const createMessageStmt = db.prepare(
     "INSERT INTO messages (id, mesh_id, sender, recipient, type, payload, timestamp, is_read, task_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"

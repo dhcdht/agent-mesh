@@ -3,266 +3,201 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Agent Mesh 控制台</title>
+  <title>Agent Mesh 控制台 (STABLE)</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #1a1a2e; color: #eee; }
-    h1 { margin: 0 0 1rem; font-size: 1.5rem; }
-    .section { margin-bottom: 1.5rem; }
-    .section h2 { font-size: 1rem; color: #888; margin: 0 0 0.5rem; }
-    select, button { padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #444; background: #2a2a3e; color: #eee; }
-    button { cursor: pointer; }
-    button:hover { background: #3a3a4e; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #333; }
-    th { color: #888; font-weight: 500; }
-    .status-pending { color: #f59e0b; }
-    .status-in_progress { color: #3b82f6; }
-    .status-completed { color: #22c55e; }
-    .msg { font-size: 0.875rem; padding: 0.5rem; background: #252538; border-radius: 4px; margin-bottom: 0.25rem; }
-    .msg .meta { color: #888; font-size: 0.75rem; }
-    .error { color: #ef4444; }
+    body { 
+      margin: 0; padding: 0; height: 100vh; overflow: hidden;
+      background: #0f172a; color: #f1f5f9; font-family: system-ui, sans-serif;
+      display: flex; flex-direction: column;
+    }
+    header {
+      height: 60px; border-bottom: 1px solid #334155; background: #1e293b;
+      display: flex; align-items: center; justify-content: space-between; padding: 0 20px; flex-shrink: 0;
+    }
+    main { display: flex; flex: 1; overflow: hidden; }
+    
+    aside {
+      width: 280px; border-right: 1px solid #334155; background: #111827;
+      display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .aside-section { flex: 1; overflow-y: auto; padding: 15px; border-bottom: 1px solid #334155; }
+    .aside-title { font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; }
+    
+    #chatArea {
+      flex: 1; display: flex; flex-direction: column; background: #0f172a; position: relative; min-width: 0;
+    }
+    #messages {
+      flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; padding-bottom: 140px;
+    }
+    
+    #inputContainer {
+      position: absolute; bottom: 0; left: 0; right: 0; padding: 20px;
+      background: rgba(15, 23, 42, 0.95); border-top: 1px solid #334155;
+    }
+    .input-wrapper {
+      max-width: 900px; margin: 0 auto; background: #1e293b; border: 2px solid #3b82f6; 
+      border-radius: 8px; padding: 10px; display: flex; align-items: center; gap: 10px;
+    }
+    textarea {
+      flex: 1; background: transparent; border: none; color: white; outline: none;
+      resize: none; font-family: inherit; font-size: 14px; height: 32px;
+    }
+    button#sendBtn {
+      background: #3b82f6; color: white; border: none; padding: 8px 20px; 
+      border-radius: 6px; font-weight: bold; cursor: pointer;
+    }
+    button#sendBtn:disabled { opacity: 0.5; }
+    
+    .msg { max-width: 90%; display: flex; flex-direction: column; }
+    .msg.user { align-self: flex-end; text-align: right; }
+    .msg.agent { align-self: flex-start; }
+    .msg-header { font-size: 10px; color: #64748b; margin-bottom: 4px; }
+    .msg-body { 
+      padding: 12px; border-radius: 12px; font-size: 14px; line-height: 1.5; 
+      white-space: pre-wrap; word-break: break-word; text-align: left;
+    }
+    .user .msg-body { background: #3b82f6; color: white; }
+    .agent .msg-body { background: #1e293b; color: #e2e8f0; border: 1px solid #334155; }
+    
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+    .online { background: #22c55e; }
+    .offline { background: #ef4444; }
   </style>
 </head>
 <body>
-  <h1>Agent Mesh 控制台</h1>
-  <div class="section">
-    <h2>Mesh</h2>
-    <select id="meshSelect" style="padding:0.5rem;min-width:200px;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#eee;">
-      <option value="">加载中...</option>
-    </select>
-    <input type="text" id="meshInput" placeholder="或输入 mesh ID" style="padding:0.5rem;width:150px;margin-left:0.5rem;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#eee;">
-    <button id="refreshBtn">刷新</button>
-    <label style="margin-left:1rem;"><input type="checkbox" id="autoRefresh" checked> 自动刷新 (10s)</label>
-    <input type="password" id="apiKeyInput" placeholder="API Key (可选)" style="padding:0.5rem;width:120px;margin-left:0.5rem;border-radius:6px;border:1px solid #444;background:#2a2a3e;color:#eee;">
-  </div>
-  <div class="section" id="nodesSection">
-    <h2>Nodes</h2>
-    <table>
-      <thead>
-        <tr><th>ID</th><th>Mesh</th><th>状态</th><th>最后心跳</th><th>操作</th></tr>
-      </thead>
-      <tbody id="nodesBody"></tbody>
-    </table>
-  </div>
-  <div class="section" id="agentsSection">
-    <h2>Agents</h2>
-    <table>
-      <thead>
-        <tr><th>ID</th><th>Name</th><th>Status</th><th>在线</th></tr>
-      </thead>
-      <tbody id="agentsBody"></tbody>
-    </table>
-  </div>
-  <div class="section" id="tasksSection">
-    <h2>任务</h2>
-    <table>
-      <thead>
-        <tr><th>ID</th><th>Subject</th><th>Owner</th><th>Status</th><th>操作</th></tr>
-      </thead>
-      <tbody id="tasksBody"></tbody>
-    </table>
-  </div>
-  <div class="section" id="inboxSection">
-    <h2>收件箱 (lead)</h2>
-    <div id="inboxBody"></div>
-  </div>
-  <div id="error" class="error"></div>
+  <header>
+    <div style="display: flex; align-items: center; gap: 15px;">
+      <h1 style="margin: 0; font-size: 18px; color: #3b82f6;">Agent Mesh Stable</h1>
+      <select id="meshSelect" style="background: #0f172a; color: white; border: 1px solid #334155; padding: 4px 8px; border-radius: 4px;"></select>
+    </div>
+    <div style="font-size: 12px; color: #64748b;">
+      <span id="sseDot" class="dot offline"></span> <span id="sseLabel">OFFLINE</span>
+    </div>
+  </header>
+
+  <main>
+    <aside>
+      <div class="aside-section">
+        <div class="aside-title">Agents Online (<span id="agentCount">0</span>)</div>
+        <div id="agentsList"></div>
+      </div>
+      <div class="aside-section">
+        <div class="aside-title">Active Tasks (<span id="taskCount">0</span>)</div>
+        <div id="tasksList"></div>
+      </div>
+    </aside>
+
+    <section id="chatArea">
+      <div id="messages"></div>
+      <div id="inputContainer">
+        <div class="input-wrapper">
+          <textarea id="messageInput" placeholder="Send a message to the mesh..."></textarea>
+          <button id="sendBtn" disabled>SEND</button>
+        </div>
+        <div id="errorMsg" style="color: #ef4444; font-size: 10px; text-align: center; margin-top: 5px;"></div>
+      </div>
+    </section>
+  </main>
 
   <script>
     const API = '/api/v1';
-    const meshSelect = document.getElementById('meshSelect');
-    const meshInput = document.getElementById('meshInput');
-    const nodesBody = document.getElementById('nodesBody');
-    const agentsBody = document.getElementById('agentsBody');
-    const tasksBody = document.getElementById('tasksBody');
-    const inboxBody = document.getElementById('inboxBody');
-    const refreshBtn = document.getElementById('refreshBtn');
-    const autoRefreshEl = document.getElementById('autoRefresh');
-    const apiKeyInput = document.getElementById('apiKeyInput');
-    const errEl = document.getElementById('error');
+    const state = { meshId: '', sse: null, seen: new Set() };
+    const els = {
+      meshSelect: document.getElementById('meshSelect'),
+      agentsList: document.getElementById('agentsList'),
+      tasksList: document.getElementById('tasksList'),
+      agentCount: document.getElementById('agentCount'),
+      taskCount: document.getElementById('taskCount'),
+      messages: document.getElementById('messages'),
+      messageInput: document.getElementById('messageInput'),
+      sendBtn: document.getElementById('sendBtn'),
+      errorMsg: document.getElementById('errorMsg'),
+      sseDot: document.getElementById('sseDot'),
+      sseLabel: document.getElementById('sseLabel')
+    };
 
-    function getApiKey() {
-      return apiKeyInput?.value?.trim() || sessionStorage.getItem('meshApiKey') || '';
-    }
+    function genId() { return Math.random().toString(36).slice(2) + Date.now(); }
 
-    function getMeshId() {
-      const fromInput = meshInput.value.trim();
-      if (fromInput) return fromInput;
-      return meshSelect.value || '';
-    }
-
-    async function fetchJson(path, init) {
-      const apiKey = getApiKey();
-      const headers = { ...(init?.headers || {}) };
-      if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
-      const r = await fetch(API + path, { ...init, headers });
-      if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
+    async function apiReq(path, method = 'GET', body = null) {
+      const r = await fetch(API + path, {
+        method, headers: { 'Content-Type': 'application/json' },
+        body: body ? JSON.stringify(body) : null
+      });
+      if (!r.ok) throw new Error(await r.text() || r.statusText);
       return r.json();
     }
 
-    async function loadMeshes() {
+    function renderMsg(m) {
+      if (state.seen.has(m.id)) return;
+      state.seen.add(m.id);
+      const isUser = m.from === 'user' || m.from === 'lead';
+      const div = document.createElement('div');
+      div.className = `msg ${isUser ? 'user' : 'agent'}`;
+      div.innerHTML = `
+        <div class="msg-header">${m.from.toUpperCase()} @ ${new Date(m.timestamp || Date.now()).toLocaleTimeString()}</div>
+        <div class="msg-body">${typeof m.payload === 'string' ? m.payload : (m.payload.text || JSON.stringify(m.payload))}</div>
+      `;
+      els.messages.appendChild(div);
+      els.messages.scrollTo({ top: els.messages.scrollHeight, behavior: 'smooth' });
+    }
+
+    async function load() {
+      if (!state.meshId) return;
       try {
-        const { items } = await fetchJson('/meshes');
-        meshSelect.innerHTML = '<option value="">选择 mesh...</option>' +
-          items.map(m => `<option value="${m.id}">${m.id} (${m.status})</option>`).join('');
-        const saved = localStorage.getItem('meshId');
-        if (saved) meshSelect.value = saved;
-      } catch (e) {
-        meshSelect.innerHTML = '<option value="">加载失败</option>';
-      }
+        const [a, t, h] = await Promise.all([
+          apiReq(`/agents?meshId=${state.meshId}`),
+          apiReq(`/tasks?meshId=${state.meshId}`),
+          apiReq(`/meshes/${state.meshId}/channel`)
+        ]);
+        els.agentCount.textContent = a.items.length;
+        els.agentsList.innerHTML = a.items.map(i => `<div style="padding:5px 0"><span class="dot ${i.nodeOnline ? 'online' : 'offline'}"></span>${i.id}</div>`).join('');
+        els.taskCount.textContent = t.items.filter(x => x.status === 'in_progress').length;
+        els.tasksList.innerHTML = t.items.map(i => `<div style="padding:5px 0; border-bottom:1px solid #1e293b"><b>${i.id}</b>: ${i.status}</div>`).join('');
+        els.messages.innerHTML = '';
+        state.seen.clear();
+        h.items.sort((x, y) => new Date(x.timestamp) - new Date(y.timestamp)).forEach(renderMsg);
+        els.sendBtn.disabled = false;
+        connect();
+      } catch (e) { els.errorMsg.textContent = e.message; }
     }
 
-    async function loadNodes() {
-      const meshId = getMeshId();
-      const q = meshId ? '?meshId=' + encodeURIComponent(meshId) : '';
+    function connect() {
+      if (state.sse) state.sse.close();
+      state.sse = new EventSource(`${API}/events?meshId=${state.meshId}`);
+      state.sse.onopen = () => { 
+        els.sseDot.className = 'dot online'; 
+        els.sseLabel.textContent = 'ONLINE'; 
+        refreshStatus();
+      };
+      state.sse.onerror = () => { els.sseDot.className = 'dot offline'; els.sseLabel.textContent = 'RECONNECTING...'; };
+      state.sse.addEventListener('message', (e) => {
+        const ev = JSON.parse(e.data);
+        if (ev.type === 'message.created') renderMsg(ev.message);
+        else if (ev.type === 'node.heartbeat' || ev.type.startsWith('agent.')) refreshStatus();
+        else load();
+      });
+    }
+
+    async function send() {
+      const text = els.messageInput.value.trim();
+      if (!text) return;
+      const payload = { id: genId(), meshId: state.meshId, from: 'user', to: '*', type: 'message', payload: { text } };
       try {
-        const { items } = await fetchJson('/nodes' + q);
-        nodesBody.innerHTML = items.length === 0
-          ? '<tr><td colspan="5">无节点</td></tr>'
-          : items.map(n => `
-            <tr>
-              <td>${n.id}</td>
-              <td>${n.meshId}</td>
-              <td class="status-${n.status}">${n.status}</td>
-              <td>${n.lastHeartbeatAt ? new Date(n.lastHeartbeatAt).toLocaleString() : '-'}</td>
-              <td><button data-id="${n.id}" data-action="delete-node">下线</button></td>
-            </tr>
-          `).join('');
-        nodesBody.querySelectorAll('[data-action="delete-node"]').forEach(btn => {
-          btn.onclick = () => deleteNode(btn.dataset.id);
-        });
-      } catch (e) {
-        nodesBody.innerHTML = '<tr><td colspan="5" class="error">加载失败</td></tr>';
-      }
+        els.messageInput.value = '';
+        renderMsg({ ...payload, timestamp: new Date().toISOString() });
+        await apiReq('/messages', 'POST', payload);
+      } catch (e) { els.errorMsg.textContent = 'Send failed: ' + e.message; }
     }
 
-    async function deleteNode(nodeId) {
-      try {
-        const apiKey = getApiKey();
-        const headers = {};
-        if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
-        const r = await fetch(API + '/nodes/' + encodeURIComponent(nodeId), { method: 'DELETE', headers });
-        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
-        await loadNodes();
-        errEl.textContent = '';
-      } catch (e) {
-        errEl.textContent = '下线失败: ' + e.message;
-      }
-    }
+    els.meshSelect.onchange = (e) => { state.meshId = e.target.value; load(); };
+    els.sendBtn.onclick = send;
+    els.messageInput.onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
 
-    async function loadAgents() {
-      const meshId = getMeshId();
-      if (!meshId) { agentsBody.innerHTML = '<tr><td colspan="4">请选择 mesh</td></tr>'; return; }
-      try {
-        const { items } = await fetchJson(`/agents?meshId=${encodeURIComponent(meshId)}`);
-        agentsBody.innerHTML = items.length === 0
-          ? '<tr><td colspan="4">无 agents</td></tr>'
-          : items.map(a => `
-            <tr>
-              <td>${a.id}</td>
-              <td>${a.name}</td>
-              <td class="status-${a.status}">${a.status}</td>
-              <td>${a.nodeOnline === true ? '🟢' : a.nodeOnline === false ? '🔴' : '-'}</td>
-            </tr>
-          `).join('');
-      } catch (e) {
-        agentsBody.innerHTML = '<tr><td colspan="4" class="error">加载失败</td></tr>';
-      }
-    }
-
-    async function loadTasks() {
-      const meshId = getMeshId();
-      if (!meshId) { tasksBody.innerHTML = '<tr><td colspan="5">请选择 mesh</td></tr>'; return; }
-      try {
-        const { items } = await fetchJson(`/tasks?meshId=${encodeURIComponent(meshId)}`);
-        tasksBody.innerHTML = items.length === 0
-          ? '<tr><td colspan="5">无任务</td></tr>'
-          : items.map(t => `
-            <tr>
-              <td>${t.id}</td>
-              <td>${t.subject}</td>
-              <td>${t.owner}</td>
-              <td class="status-${t.status}">${t.status}</td>
-              <td>
-                ${t.status !== 'completed' ? `<button data-id="${t.id}" data-action="complete">标记完成</button>` : ''}
-              </td>
-            </tr>
-          `).join('');
-        tasksBody.querySelectorAll('[data-action="complete"]').forEach(btn => {
-          btn.onclick = () => markComplete(btn.dataset.id);
-        });
-      } catch (e) {
-        tasksBody.innerHTML = '<tr><td colspan="5" class="error">加载失败: ' + e.message + '</td></tr>';
-      }
-    }
-
-    async function markComplete(taskId) {
-      try {
-        const apiKey = getApiKey();
-        const headers = { 'Content-Type': 'application/json' };
-        if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
-        const r = await fetch(API + '/tasks/' + taskId, {
-          method: 'PATCH',
-          headers,
-          body: JSON.stringify({ status: 'completed' }),
-        });
-        if (!r.ok) throw new Error(r.status + ' ' + r.statusText);
-        await loadTasks();
-        errEl.textContent = '';
-      } catch (e) {
-        errEl.textContent = '标记失败: ' + e.message;
-      }
-    }
-
-    async function loadInbox() {
-      const meshId = getMeshId();
-      if (!meshId) { inboxBody.innerHTML = '<p>请选择 mesh</p>'; return; }
-      try {
-        const { items } = await fetchJson(`/messages/lead/inbox?meshId=${encodeURIComponent(meshId)}&unreadOnly=false`);
-        inboxBody.innerHTML = items.length === 0
-          ? '<p>无消息</p>'
-          : items.map(m => `
-            <div class="msg">
-              <div class="meta">${m.from} → ${m.to} (${m.timestamp})</div>
-              <pre>${JSON.stringify(m.payload, null, 2)}</pre>
-            </div>
-          `).join('');
-      } catch (e) {
-        inboxBody.innerHTML = '<p class="error">加载失败: ' + e.message + '</p>';
-      }
-    }
-
-    function refresh() {
-      const id = getMeshId();
-      if (id) localStorage.setItem('meshId', id);
-      loadNodes();
-      loadAgents();
-      loadTasks();
-      loadInbox();
-      errEl.textContent = '';
-    }
-
-    meshSelect.onchange = () => { meshInput.value = ''; refresh(); };
-    meshInput.onchange = () => { meshSelect.value = ''; refresh(); };
-    refreshBtn.onclick = refresh;
-    apiKeyInput?.addEventListener('change', () => {
-      const v = apiKeyInput.value.trim();
-      if (v) sessionStorage.setItem('meshApiKey', v);
-      else sessionStorage.removeItem('meshApiKey');
-      refresh();
+    apiReq('/meshes').then(r => {
+      els.meshSelect.innerHTML = r.items.map(m => `<option value="${m.id}">${m.id}</option>`).join('');
+      if (r.items.length > 0) { state.meshId = r.items[0].id; load(); }
     });
-    if (sessionStorage.getItem('meshApiKey')) {
-      apiKeyInput.placeholder = 'API Key (已设置)';
-    }
-
-    loadMeshes().then(() => {
-      const saved = localStorage.getItem('meshId');
-      if (saved) { meshSelect.value = saved; refresh(); }
-      else refresh();
-    });
-
-    setInterval(() => { if (autoRefreshEl.checked && getMeshId()) refresh(); }, 10000);
   </script>
 </body>
 </html>

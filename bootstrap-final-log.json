@@ -1,0 +1,16 @@
+{
+  "items": [
+    {
+      "id": "bootstrap-cmd-stable",
+      "meshId": "agent-mesh-dev",
+      "from": "user",
+      "to": "*",
+      "type": "message",
+      "payload": {
+        "text": "* 自举启动：请 agent-shared 先在 packages/shared/src/types.ts 中定义新的汇总统计接口类型 StatusResponse。完成后请广播。"
+      },
+      "timestamp": "2026-03-21T14:29:06.083Z",
+      "read": false
+    }
+  ]
+}

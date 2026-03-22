@@ -57,6 +57,20 @@ export interface Agent {
   cliConfig: Record<string, unknown>;
   nodeId?: string;
   status: AgentStatus;
+  nodeOnline?: boolean;
+}
+
+export interface CreateTaskPayload {
+  meshId?: string;
+  subject: string;
+  description: string;
+  owner: string;
+  repoId?: string;
+}
+
+export interface UpdateTaskPayload {
+  status?: TaskStatus;
+  owner?: string;
 }
 
 export interface Repo {
