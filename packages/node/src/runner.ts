@@ -124,7 +124,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
           
           const isFromUser = message.from === "user" || message.from === "lead";
           const isDirectQuestion = message.type === "question" && message.to === agentId;
-          const shouldReply = false && text && !isStdinArgsOnly && (isFromUser || isDirectQuestion);
+          const shouldReply = text && !isStdinArgsOnly && (isFromUser || isDirectQuestion);
 
           if (shouldReply) {
             console.log(`[node] agent:${agentId} replying...`);
