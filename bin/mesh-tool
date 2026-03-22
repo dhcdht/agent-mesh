@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+const [,, cmd, ...args] = process.argv;
+const API = process.env.MESH_COORDINATOR_URL || "http://localhost:3000";
+const MESH_ID = process.env.MESH_ID || "agent-mesh-dev";
+
+async function run() {
+  if (cmd === "task:create") {
+    const params = Object.fromEntries(args.map(a => a.split("=")));
+    const res = await fetch(`${API}/api/v1/tasks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: params.id || `task-${Date.now()}`,
+        meshId: MESH_ID,
+        subject: params.subject,
+        description: params.desc,
+        owner: params.owner || "",
+        repoId: params.repo || "repo-core"
+      })
+    });
+    const data = await res.json();
+    console.log(`SUCCESS: Task ${data.id} created.`);
+  }
+}
+run().catch(e => console.error(e));

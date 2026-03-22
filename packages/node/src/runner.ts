@@ -3,6 +3,7 @@ import { BROADCAST_RECIPIENT } from "@agent-mesh/shared";
 import type { NodeConfig } from "./types.js";
 import { createAdapter } from "./adapters/factory.js";
 import { CoordinatorClient } from "./client.js";
+import path from "node:path";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,7 +65,18 @@ export async function runNode(config: NodeConfig): Promise<void> {
       nodeId: config.node.id,
     });
 
-    adapters.set(repo.agent.id, createAdapter(repo.agent.cliType, repo.agent.id, repo.agent.cliConfig, repo.path));
+    const binPath = path.join(process.cwd(), "bin");
+    const cliConfig = {
+      ...(repo.agent.cliConfig as Record<string, unknown>),
+      env: {
+        ...(process.env),
+        PATH: `${binPath}:${process.env.PATH}`,
+        MESH_ID: config.mesh.id,
+        MESH_COORDINATOR_URL: config.coordinator.url
+      }
+    };
+
+    adapters.set(repo.agent.id, createAdapter(repo.agent.cliType, repo.agent.id, cliConfig, repo.path));
   }
 
   const runAgentLoop = async (repo: (typeof config.repos)[0]) => {
@@ -86,8 +98,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
         for (const task of unownedTasks) {
           try {
             await client.claimTask(task.id, agentId);
-          } catch {
-          }
+          } catch {}
         }
 
         const taskSnapshot = (allTasks as any[])
@@ -108,15 +119,14 @@ export async function runNode(config: NodeConfig): Promise<void> {
           const shouldReply = text && !isStdinArgsOnly && (isFromUser || isDirectQuestion);
 
           if (shouldReply) {
-            console.log(`[node:${config.node.id}] [agent:${agentId}] queuing reply to ${message.from}`);
+            console.log(`[node] agent:${agentId} replying...`);
             try {
               await globalLock.acquire();
-              console.log(`[node:${config.node.id}] [agent:${agentId}] executing reply...`);
               const syntheticTask = {
                 id: `msg-${message.id}`,
                 meshId: config.mesh.id,
                 subject: `Reply to ${message.from}`,
-                description: `[RULES]\n1. ONLY reply if you have CODE or a CONCRETE PLAN.\n2. NO "OK" or "Forwarded" messages.\n3. Be concise.\n\n[CONTEXT]\nMembers: ${allAgentIds}\n\n[MESSAGE]\n${text}`,
+                description: `[RULES]\n1. ONLY reply if you have CODE or a PLAN.\n2. NO "OK" messages.\n3. You have 'mesh-tool' in PATH to create tasks.\n\n[CONTEXT]\nMembers: ${allAgentIds}\n\n[MESSAGE]\n${text}`,
                 status: "pending" as const,
                 owner: agentId,
                 repoId: repo.id,
@@ -130,7 +140,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
                 from: agentId,
                 to: BROADCAST_RECIPIENT,
                 type: "message",
-                payload: { text: result.summary, output: result.output },
+                payload: { text: result.summary },
                 taskId: message.taskId,
               });
             } catch (e) {
@@ -146,15 +156,6 @@ export async function runNode(config: NodeConfig): Promise<void> {
             } finally {
               globalLock.release();
             }
-          } else if (adapter.deliverMessage) {
-            await adapter.deliverMessage({
-              id: message.id,
-              from: message.from,
-              to: message.to,
-              type: message.type,
-              payload: message.payload,
-              taskId: message.taskId,
-            });
           }
           await client.markMessageRead(message.id, agentId);
         }
@@ -163,9 +164,7 @@ export async function runNode(config: NodeConfig): Promise<void> {
         for (const task of tasks) {
           try {
             await client.markTaskStatus(task.id, "in_progress");
-            console.log(`[node:${config.node.id}] [agent:${agentId}] queuing task ${task.id}...`);
             await globalLock.acquire();
-            console.log(`[node:${config.node.id}] [agent:${agentId}] executing task ${task.id}...`);
             const result = await adapter.execute(task);
             await client.markTaskStatus(task.id, "completed");
             await client.sendMessage({
@@ -174,11 +173,12 @@ export async function runNode(config: NodeConfig): Promise<void> {
               from: agentId,
               to: BROADCAST_RECIPIENT,
               type: "done",
-              payload: { taskId: task.id, summary: result.summary, output: result.output },
+              payload: { taskId: task.id, summary: result.summary },
               taskId: task.id,
             });
           } catch (error) {
             console.error(`[node:${config.node.id}] [agent:${agentId}] task failed ${task.id}`, error);
+            await client.markTaskStatus(task.id, "deleted");
             await client.sendMessage({
               id: randomUUID(),
               meshId: config.mesh.id,
@@ -189,147 +189,18 @@ export async function runNode(config: NodeConfig): Promise<void> {
               taskId: task.id,
             });
           } finally {
+
             globalLock.release();
           }
         }
-      } catch (e) {
-        console.error(`[node:${config.node.id}] [agent:${agentId}] loop error:`, e);
-      }
-
+      } catch (e) {}
       await sleep(config.node.pollIntervalMs);
     }
   };
 
-  const startHeartbeat = () => {
-    setInterval(() => {
-      client.heartbeat(config.node.id, config.mesh.id).catch(() => {});
-    }, 10000);
-  };
-
-  startHeartbeat();
-  await Promise.all(config.repos.map(runAgentLoop));
-}
-
-        }
-
-        const taskSnapshot = (allTasks as any[])
-          .map(t => `- [${t.status}] ${t.id}: ${t.subject} (owner: ${t.owner})`)
-          .join("\n");
-
-        for (const message of inbox) {
-          if (message.from === agentId || message.from === "system") {
-            await client.markMessageRead(message.id, agentId);
-            continue;
-          }
-
-          console.log(
-            `[node:${config.node.id}] [agent:${agentId}] inbox <- ${message.from} (${message.type})`
-          );
-
-          const payload = message.payload as Record<string, unknown>;
-          const text = (payload?.text ?? payload?.summary ?? JSON.stringify(payload)) as string;
-          
-          // STRICT REPLY POLICY:
-          // 1. Always reply to User
-          // 2. Reply to other Agents ONLY if it is a specific "question" directed at us.
-          // 3. IGNORE "message" or "broadcast" from other agents to prevent loops.
-          const isFromUser = message.from === "user" || message.from === "lead";
-          const isDirectQuestion = message.type === "question" && message.to === agentId;
-          
-          const shouldReply = text && !isStdinArgsOnly && (isFromUser || isDirectQuestion);
-
-          if (shouldReply) {
-            console.log(`[node:${config.node.id}] [agent:${agentId}] replying to ${message.from}`);
-            const syntheticTask = {
-              id: `msg-${message.id}`,
-              meshId: config.mesh.id,
-              subject: `Reply to ${message.from}`,
-              description: `[RULES]\n1. ONLY reply if you have CODE or a CONCRETE PLAN.\n2. NO "OK" or "Forwarded" messages.\n3. Be concise.\n\n[CONTEXT]\nMembers: ${allAgentIds}\n\n[MESSAGE]\n${text}`,
-              status: "pending" as const,
-              owner: agentId,
-              repoId: repo.id,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            try {
-              await globalLock.acquire();
-              const result = await adapter.execute(syntheticTask);
-              await client.sendMessage({
-                id: randomUUID(),
-                meshId: config.mesh.id,
-                from: agentId,
-                to: BROADCAST_RECIPIENT,
-                type: "message",
-                payload: { text: result.summary, output: result.output },
-                taskId: message.taskId,
-              });
-            } catch (e) {
-              await client.sendMessage({
-                id: randomUUID(),
-                meshId: config.mesh.id,
-                from: agentId,
-                to: BROADCAST_RECIPIENT,
-                type: "message",
-                payload: { error: String(e) },
-                taskId: message.taskId,
-              });
-            } finally {
-              globalLock.release();
-            }
-          } else if (adapter.deliverMessage) {
-            await adapter.deliverMessage({
-              id: message.id,
-              from: message.from,
-              to: message.to,
-              type: message.type,
-              payload: message.payload,
-              taskId: message.taskId,
-            });
-          }
-          await client.markMessageRead(message.id, agentId);
-        }
-
-        const tasks = await client.listPendingTasks(config.mesh.id, agentId);
-        for (const task of tasks) {
-          try {
-            await client.markTaskStatus(task.id, "in_progress");
-            await globalLock.acquire();
-            const result = await adapter.execute(task);
-            await client.markTaskStatus(task.id, "completed");
-            await client.sendMessage({
-              id: randomUUID(),
-              meshId: config.mesh.id,
-              from: agentId,
-              to: BROADCAST_RECIPIENT,
-              type: "done",
-              payload: { taskId: task.id, summary: result.summary, output: result.output },
-              taskId: task.id,
-            });
-          } catch (error) {
-            console.error(`[node:${config.node.id}] [agent:${agentId}] task failed ${task.id}`, error);
-            await client.sendMessage({
-              id: randomUUID(),
-              meshId: config.mesh.id,
-              from: agentId,
-              to: BROADCAST_RECIPIENT,
-              type: "failed",
-              payload: { taskId: task.id, error: String(error) },
-              taskId: task.id,
-            });
-          } finally {
-            globalLock.release();
-          }
-        }
-      } catch (e) {
-        console.error(`[node:${config.node.id}] [agent:${agentId}] loop error:`, e);
-      }
-
-      await Promise.all([
-        sleep(config.node.pollIntervalMs),
-        client.heartbeat(config.node.id, config.mesh.id).catch(() => {}),
-      ]);
-    }
-  };
+  setInterval(() => {
+    client.heartbeat(config.node.id, config.mesh.id).catch(() => {});
+  }, 10000);
 
   await Promise.all(config.repos.map(runAgentLoop));
 }
