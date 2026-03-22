@@ -97,13 +97,21 @@ export class StdinAdapter implements AgentAdapter {
             output: { output, exitCode: code },
           });
         } else {
-          reject(new Error(`Stdin adapter exited with code ${code}: ${output.slice(0, 200)}`));
+          reject(new Error(`Stdin adapter exited with code ${code}: ${output.slice(0, 500)}`));
         }
       });
 
       if (proc.stdin) {
-        proc.stdin.write(promptText);
-        proc.stdin.end();
+        const timer = setTimeout(() => {
+          if (proc.stdin?.writable) {
+            proc.stdin.write(promptText, (err) => {
+              if (!err) {
+                proc.stdin?.end();
+              }
+            });
+          }
+        }, 200);
+        proc.on("close", () => clearTimeout(timer));
       }
     });
   }
