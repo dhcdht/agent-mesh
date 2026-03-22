@@ -7,7 +7,6 @@ interface StdinAdapterConfig {
   args?: string[];
   timeoutMs: number;
   cwd?: string;
-  /** 若 true，不把 task 内容追加到 args（用于 pnpm test 等纯命令） */
   argsOnly?: boolean;
 }
 
@@ -66,9 +65,7 @@ export class StdinAdapter implements AgentAdapter {
       this.pendingMessages = [];
     }
 
-    const args = this.config.argsOnly
-      ? baseArgs
-      : [...baseArgs, promptText];
+    const args = baseArgs;
 
     return new Promise((resolve, reject) => {
       const proc = spawn(this.config.command, args, {
@@ -85,7 +82,7 @@ export class StdinAdapter implements AgentAdapter {
       });
 
       const timeout = setTimeout(() => {
-        proc.kill("SIGTERM");
+        proc.kill("SIGKILL");
         reject(new Error(`Stdin adapter timed out after ${this.config.timeoutMs}ms`));
       }, this.config.timeoutMs);
 
@@ -98,24 +95,14 @@ export class StdinAdapter implements AgentAdapter {
             output: { output, exitCode: code },
           });
         } else {
-          reject(
-            new Error(
-              `Stdin adapter exited with code ${code}${signal ? ` signal ${signal}` : ""}: ${output.slice(0, 200)}`
-            )
-          );
+          reject(new Error(`Stdin adapter exited with code ${code}: ${output.slice(0, 200)}`));
         }
       });
 
-      proc.on("error", (err) => {
-        clearTimeout(timeout);
-        if ((err as any).code === "ENOENT") {
-          reject(new Error(`Command not found: ${this.config.command}. Please ensure it is installed and in your PATH.`));
-        } else {
-          reject(err);
-        }
-      });
-
-      proc.stdin?.end();
+      if (proc.stdin) {
+        proc.stdin.write(promptText);
+        proc.stdin.end();
+      }
     });
   }
 }

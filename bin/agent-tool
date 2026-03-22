@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+import { writeFileSync, readFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+
+const [,, cmd, ...args] = process.argv;
+const params = Object.fromEntries(args.map(a => a.split("=")));
+
+if (cmd === "write") {
+  mkdirSync(dirname(params.path), { recursive: true });
+  writeFileSync(params.path, params.content);
+  console.log(`SUCCESS: Wrote to ${params.path}`);
+}

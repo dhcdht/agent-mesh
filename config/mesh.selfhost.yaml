@@ -8,33 +8,17 @@ repos:
     agent:
       id: agent-coordinator
       name: Coordinator 专家
-      cliType: noop
-      cliConfig: {}
-
-  - id: repo-node
-    path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/node
-    agent:
-      id: agent-node
-      name: Node 运行时专家
       cliType: stdin
       cliConfig:
         command: claude
         args: ["-p"]
         timeoutMs: 600000
 
-  - id: repo-cli
-    path: /Users/dhcdht/Desktop/Projects/agent-mesh/apps/cli
+  - id: repo-node
+    path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/node
     agent:
-      id: agent-cli
-      name: CLI 体验专家
-      cliType: noop
-      cliConfig: {}
-
-  - id: repo-shared
-    path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/shared
-    agent:
-      id: agent-shared
-      name: 架构师 (Shared)
+      id: agent-node
+      name: Node 专家
       cliType: noop
       cliConfig: {}
 
@@ -44,4 +28,4 @@ coordinator:
 
 node:
   id: node-selfhost
-  pollIntervalMs: 2000
+  pollIntervalMs: 3000
