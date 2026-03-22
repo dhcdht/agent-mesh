@@ -8,10 +8,10 @@ repos:
     agent:
       id: agent-coordinator
       name: Coordinator 专家
-      cliType: stdin
+      cliType: acp-pool
       cliConfig:
-        command: claude
-        args: ["-p"]
+        command: opencode
+        args: ["acp"]
         timeoutMs: 600000
 
   - id: repo-node
