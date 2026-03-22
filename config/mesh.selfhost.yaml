@@ -8,22 +8,15 @@ repos:
     agent:
       id: agent-coordinator
       name: Coordinator 专家
-      cliType: stdin
-      cliConfig:
-        command: claude
-        args: ["-p"]
-        timeoutMs: 600000
-        env:
-          CLAUDE_CODE_FORCE_ACCEPT: "1"
-          NON_INTERACTIVE: "true"
-          CI: "true"
+      cliType: noop
+      cliConfig: {}
 
   - id: repo-node
     path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/node
     agent:
       id: agent-node
       name: Node 运行时专家
-      cliType: noop
+      cliType: pi-agent
       cliConfig: {}
 
 coordinator:
@@ -32,4 +25,4 @@ coordinator:
 
 node:
   id: node-selfhost
-  pollIntervalMs: 3000
+  pollIntervalMs: 2000
