@@ -131,7 +131,15 @@ export async function runNode(config: NodeConfig): Promise<void> {
             
             let architectContext = "";
             if (agentId === "agent-coordinator") {
-              architectContext = `\n[ARCHITECT ROLE]\nYou are the Lead Architect. When you receive a complex requirement, use 'mesh-tool task:create' to decompose it into sub-tasks with 'parentId'.\n`;
+              architectContext = `
+[ARCHITECT ROLE]
+You are the Lead Architect. 
+Your primary tool is 'mesh-tool task:create'.
+If a task is multi-step or fuzzy, you MUST:
+1. Create sub-tasks for specialized agents (agent-node, agent-cli, etc.).
+2. Set 'parentId' to the current task ID.
+3. DO NOT conversationalize. EXECUTE tool calls.
+`;
             }
 
             try {
