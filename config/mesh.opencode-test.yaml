@@ -1,0 +1,15 @@
+mesh:
+  id: opencode-test-mesh
+repos:
+  - id: r1
+    path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/coordinator
+    agent:
+      id: a1
+      cliType: opencode-sdk
+      cliConfig:
+        model: "anthropic/claude-3-5-sonnet-20241022"
+coordinator:
+  url: http://localhost:3000
+node:
+  id: n1
+  pollIntervalMs: 1000

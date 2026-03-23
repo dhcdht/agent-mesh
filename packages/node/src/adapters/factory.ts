@@ -4,6 +4,7 @@ import { AcpPoolAdapter } from "./acp-pool.js";
 import { ClaudeCodeAdapter } from "./claude-code.js";
 import { NoopAdapter } from "./noop.js";
 import { PiAgentAdapter } from "./pi-agent.js";
+import { OpenCodeSdkAdapter } from "./opencode-sdk.js";
 import { OpenCodeAdapter } from "./opencode.js";
 import { OpenCodeCliAdapter } from "./opencode-cli.js";
 import { StdinAdapter } from "./stdin.js";
@@ -31,6 +32,8 @@ export function createAdapter(
       return new ClaudeCodeAdapter(agentId, merged);
     case "pi-agent":
       return new PiAgentAdapter(agentId, merged);
+    case "opencode-sdk":
+      return new OpenCodeSdkAdapter(agentId, merged);
     case "stdin":
       return new StdinAdapter(agentId, merged);
     default:

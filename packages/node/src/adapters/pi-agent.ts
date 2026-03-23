@@ -165,20 +165,17 @@ Please execute this task now.
 
       await session.prompt(promptText);
 
-      // Clean up subscription
-      unsubscribe();
-      session.dispose();
-
-      // Extract result from session state after completion
-      // Find the last assistant message that indicates completion
       const messages = session.state.messages;
       const lastMsg = messages[messages.length - 1];
       const resultText = lastMsg && lastMsg.role === 'assistant' 
         ? lastMsg.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n')
         : `PiAgent SDK completed task ${task.id}`;
 
+      unsubscribe();
+      session.dispose();
+
       return {
-        summary: resultText || `Task ${task.id} completed.`,
+        summary: resultText,
         output: { stdout: resultText, stderr: "", exitCode: 0 }
       };
     } catch (e) {
