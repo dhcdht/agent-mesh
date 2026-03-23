@@ -128,13 +128,19 @@ export async function runNode(config: NodeConfig): Promise<void> {
 
           if (shouldReply) {
             console.log(`[node] agent:${agentId} replying...`);
+            
+            let architectContext = "";
+            if (agentId === "agent-coordinator") {
+              architectContext = `\n[ARCHITECT ROLE]\nYou are the Lead Architect. When you receive a complex requirement, use 'mesh-tool task:create' to decompose it into sub-tasks with 'parentId'.\n`;
+            }
+
             try {
               await globalLock.acquire(agentId);
               const syntheticTask = {
                 id: `msg-${message.id}`,
                 meshId: config.mesh.id,
                 subject: `Reply to ${message.from}`,
-                description: `[RULES]\n1. ONLY reply if you have CODE or a PLAN.\n2. NO "OK" messages.\n3. You have 'mesh-tool' in PATH to create tasks.\n\n[CONTEXT]\nMembers: ${allAgentIds}\n\n[MESSAGE]\n${text}`,
+                description: `[RULES]\n1. ONLY reply if you have CODE or a PLAN.\n2. NO "OK" messages.\n3. You have 'mesh-tool' in PATH to create tasks.${architectContext}\n\n[CONTEXT]\nMembers: ${allAgentIds}\n\n[MESSAGE]\n${text}`,
                 status: "pending" as const,
                 owner: agentId,
                 repoId: repo.id,
