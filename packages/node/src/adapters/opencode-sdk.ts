@@ -22,11 +22,10 @@ export class OpenCodeSdkAdapter implements AgentAdapter {
         },
       });
 
-      // 根据 SDK 物理核查后的正确 schema 编写
       const sessionRes = await client.session.create({
         body: {
           cwd,
-          title: `Mesh Session: ${task.id}`
+          title: `Mesh Task: ${task.id}`
         }
       } as any);
 
@@ -34,11 +33,13 @@ export class OpenCodeSdkAdapter implements AgentAdapter {
         throw new Error("Failed to create session: " + JSON.stringify(sessionRes.error));
       }
 
-      const sessionId = (sessionRes.data as any)?.id;
-      if (!sessionId) throw new Error("No sessionId returned");
+      const sessionId = (sessionRes.data as any).id;
 
       let promptText = `You are agent ${this.agentId}. Complete task ${task.id}: ${task.subject}\n\n${task.description}`;
-      
+      if (this.pendingMessages.length > 0) {
+        promptText += "\n\n[MESSAGES]\n" + JSON.stringify(this.pendingMessages);
+      }
+
       const response = await client.session.prompt({
         path: { id: sessionId },
         body: {
@@ -46,12 +47,14 @@ export class OpenCodeSdkAdapter implements AgentAdapter {
         }
       } as any);
 
-      if (response.error) throw new Error("Prompt error: " + JSON.stringify(response.error));
+      if (response.error) {
+        throw new Error("Prompt error: " + JSON.stringify(response.error));
+      }
 
-      const summary = (response.data as any)?.parts
-        ?.filter((p: any) => p.type === 'text')
-        ?.map((p: any) => p.text)
-        ?.join('\n') || "Task completed via OpenCode SDK";
+      const summary = (response.data as any).parts
+        .filter((p: any) => p.type === 'text')
+        .map((p: any) => p.text)
+        .join('\n');
 
       await client.session.delete({ path: { id: sessionId } } as any);
       server.close();

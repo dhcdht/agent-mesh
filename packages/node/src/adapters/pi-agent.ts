@@ -23,47 +23,45 @@ export class PiAgentAdapter implements AgentAdapter {
         model: this.config.model || "anthropic/claude-3-5-sonnet-20241022"
       });
 
-    const systemPrompt = `
-You are agent '${this.agentId}'. Your workspace is: ${cwd}.
-[CRITICAL] When the user says "FILE: <path> CONTENT: <text>", you MUST use the 'mesh-edit' tool to perform the write immediately.
-DO NOT provide conversational confirmation. Use the 'bash' or 'mesh-edit' tool to modify the file.
-    `;
+      let isDone = false;
+      const completionPromise = new Promise<void>((resolve) => {
+        const unsubscribe = session.subscribe((event: any) => {
+          if (event.type === 'tool_execution_start') {
+            console.log(`[PiAgentAdapter] Agent ${this.agentId} calling tool: ${event.toolName}`);
+          }
+          if (event.type === 'message_end' && event.message.role === 'assistant') {
+            const lastMsg: any = session.state.messages[session.state.messages.length - 1];
+            const hasPendingTools = lastMsg?.content?.some((c: any) => c.type === 'toolCall');
+            if (!hasPendingTools) {
+              isDone = true;
+              resolve();
+            }
+          }
+        });
+        
+        setTimeout(() => { if (!isDone) resolve(); }, 300000);
+      });
 
       const promptText = `
-${systemPrompt}
-TASK: ${task.subject}
-DETAIL: ${task.description}
-RECENT_MESSAGES: ${JSON.stringify(this.pendingMessages)}
+[IDENTITY]
+You are agent '${this.agentId}'. Your workspace is: ${cwd}.
+[TOOLS]
+Use BASH or your built-in file tools to execute:
+${task.subject}
+${task.description}
+[MESSAGES]
+${JSON.stringify(this.pendingMessages)}
       `;
 
       await session.prompt(promptText);
+      await completionPromise;
 
-      let isDone = false;
-      let lastMessageCount = session.state.messages.length;
-      let stableRounds = 0;
-
-      while (!isDone && stableRounds < 10) {
-        await new Promise(r => setTimeout(r, 2000));
-        if (session.state.messages.length === lastMessageCount) {
-          stableRounds++;
-        } else {
-          stableRounds = 0;
-          lastMessageCount = session.state.messages.length;
-        }
-        
-        const lastMsg = session.state.messages[session.state.messages.length - 1];
-        if (lastMsg.role === 'assistant' && !lastMsg.content.some((c: any) => c.type === 'toolCall')) {
-          isDone = true;
-        }
-      }
-
-      const messages = session.state.messages;
-      const lastMsg = messages[messages.length - 1];
-      const resultText = lastMsg && lastMsg.role === 'assistant' 
-        ? lastMsg.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n')
-        : `Pi SDK autonomous run complete for ${task.id}`;
+      const lastMsg: any = session.state.messages[session.state.messages.length - 1];
+      const resultText = lastMsg?.content
+        ?.filter((c: any) => c.type === 'text')?.map((c: any) => c.text)?.join('\n') || "Complete";
 
       session.dispose();
+
 
       return {
         summary: resultText,
