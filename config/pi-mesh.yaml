@@ -1,0 +1,16 @@
+coordinator:
+  url: "http://localhost:3000"
+
+mesh:
+  id: "test-mesh"
+  name: "Test Mesh"
+
+repos:
+  - id: "agent-mesh"
+    path: "/Users/dhcdht/Desktop/Projects/agent-mesh"
+    agent:
+      id: "agent-plugin"
+      name: "Agent Plugin"
+      cliType: "pi-agent"
+      config:
+        model: "openai:gpt-4o-mini"

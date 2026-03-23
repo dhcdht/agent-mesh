@@ -1,0 +1,21 @@
+mesh:
+  id: pi-test-mesh
+  name: Pi Agent Test Mesh
+
+repos:
+  - id: test-repo
+    path: /tmp/pi-agent-test
+    agent:
+      id: agent-pi
+      name: Pi Agent
+      cliType: pi-agent
+      cliConfig:
+        cwd: /tmp/pi-agent-test
+
+coordinator:
+  url: http://localhost:3000
+  apiKey: ""
+
+node:
+  id: node-pi-test
+  pollIntervalMs: 2000

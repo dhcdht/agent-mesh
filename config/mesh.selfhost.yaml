@@ -7,12 +7,10 @@ repos:
     path: /Users/dhcdht/Desktop/Projects/agent-mesh
     agent:
       id: agent-node
-      name: Node 运行时专家
-      cliType: stdin
+      name: Node 运行时专家 (SDK)
+      cliType: pi-agent
       cliConfig:
-        command: node
-        args: ["/Users/dhcdht/Desktop/Projects/agent-mesh/bin/agent-executor.js"]
-        timeoutMs: 30000
+        timeoutMs: 600000
 
 coordinator:
   url: http://localhost:3000
