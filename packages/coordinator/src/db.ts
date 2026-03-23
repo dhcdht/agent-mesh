@@ -61,11 +61,11 @@ export function createStorage(dbPath: string): CoordinatorStorage {
       status TEXT NOT NULL,
       owner TEXT NOT NULL,
       repo_id TEXT NOT NULL,
-      
-      
+      parent_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
-      FOREIGN KEY(mesh_id) REFERENCES meshes(id)
+      FOREIGN KEY(mesh_id) REFERENCES meshes(id),
+      FOREIGN KEY(parent_id) REFERENCES tasks(id)
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -155,9 +155,9 @@ export function createStorage(dbPath: string): CoordinatorStorage {
     WHERE a.mesh_id = ? AND a.node_id = ?
   `);
 
-const createTaskStmt = db.prepare(
-  "INSERT INTO tasks (id, mesh_id, subject, description, status, owner, repo_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-);
+  const createTaskStmt = db.prepare(
+    "INSERT INTO tasks (id, mesh_id, subject, description, status, owner, repo_id, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  );
   const getTaskStmt = db.prepare("SELECT * FROM tasks WHERE id = ?");
   const listTasksByMeshStmt = db.prepare("SELECT * FROM tasks WHERE mesh_id = ?");
   const listTasksByFilterStmt = db.prepare(
@@ -263,6 +263,7 @@ const createTaskStmt = db.prepare(
       status: row.status,
       owner: row.owner,
       repoId: row.repo_id,
+      parentId: row.parent_id ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -365,28 +366,30 @@ const createTaskStmt = db.prepare(
 
 createTask(input: CreateTaskInput): Task {
   const now = nowIso();
-  const task: Task = {
-    id: input.id,
-    meshId: input.meshId,
-    subject: input.subject,
-    description: input.description,
-    status: "pending",
-    owner: input.owner,
-    repoId: input.repoId,
-    createdAt: now,
-    updatedAt: now,
-  };
-  createTaskStmt.run(
-    task.id,
-    task.meshId,
-    task.subject,
-    task.description,
-    task.status,
-    task.owner,
-    task.repoId,
-    task.createdAt,
-    task.updatedAt
-  );
+    const task: Task = {
+      id: input.id,
+      meshId: input.meshId,
+      subject: input.subject,
+      description: input.description,
+      status: "pending",
+      owner: input.owner,
+      repoId: input.repoId,
+      parentId: input.parentId,
+      createdAt: now,
+      updatedAt: now,
+    };
+    createTaskStmt.run(
+      task.id,
+      task.meshId,
+      task.subject,
+      task.description,
+      task.status,
+      task.owner,
+      task.repoId,
+      task.parentId ?? null,
+      task.createdAt,
+      task.updatedAt
+    );
   return task;
 },
 

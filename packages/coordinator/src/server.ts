@@ -15,6 +15,7 @@ import { registerNodeRoutes } from "./routes/nodes.js";
 import { registerRepoRoutes } from "./routes/repos.js";
 import { registerPingRoutes } from "./routes/ping.js";
 import { registerTaskRoutes } from "./routes/tasks.js";
+import { createMcpServer, SSEServerTransport, StdioServerTransport } from "./mcp/server.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -74,6 +75,22 @@ export async function buildServer(dbPath: string): Promise<FastifyInstance> {
       await registerMessageRoutes(api);
       await registerEventRoutes(api);
       await registerPingRoutes(api);
+
+      const mcpServer = await createMcpServer(app.storage);
+      let mcpTransport: SSEServerTransport | null = null;
+
+      api.get("/mcp", async (request, reply) => {
+        mcpTransport = new SSEServerTransport("/api/v1/mcp/messages", reply.raw);
+        await mcpServer.connect(mcpTransport);
+      });
+
+      api.post("/mcp/messages", async (request, reply) => {
+        if (mcpTransport) {
+          await mcpTransport.handlePostMessage(request.raw, reply.raw);
+        } else {
+          reply.code(400).send({ error: "no_mcp_session" });
+        }
+      });
     },
     { prefix: "/api/v1" }
   );

@@ -37,6 +37,7 @@ export interface CreateTaskInput {
   description: string;
   owner: string;
   repoId: string;
+  parentId?: string;
 }
 
 export interface UpdateTaskInput {

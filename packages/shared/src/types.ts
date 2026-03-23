@@ -18,6 +18,7 @@ export interface Task {
   status: TaskStatus;
   owner: string;
   repoId: string;
+  parentId?: string;
   createdAt: string;
   updatedAt: string;
 }
