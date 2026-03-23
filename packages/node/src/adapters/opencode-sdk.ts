@@ -25,7 +25,7 @@ export class OpenCodeSdkAdapter implements AgentAdapter {
       const sessionRes = await client.session.create({
         body: {
           cwd,
-          title: `Mesh Task: ${task.id}`
+          title: "Mesh Task: " + task.id
         }
       } as any);
 
@@ -34,11 +34,7 @@ export class OpenCodeSdkAdapter implements AgentAdapter {
       }
 
       const sessionId = (sessionRes.data as any).id;
-
-      let promptText = `You are agent ${this.agentId}. Complete task ${task.id}: ${task.subject}\n\n${task.description}`;
-      if (this.pendingMessages.length > 0) {
-        promptText += "\n\n[MESSAGES]\n" + JSON.stringify(this.pendingMessages);
-      }
+      const promptText = "Task: " + task.subject + "\nDetail: " + task.description;
 
       const response = await client.session.prompt({
         path: { id: sessionId },
@@ -64,7 +60,7 @@ export class OpenCodeSdkAdapter implements AgentAdapter {
         output: { stdout: summary, stderr: "", exitCode: 0 }
       };
     } catch (e) {
-      throw new Error(`OpenCode SDK Error: ${e instanceof Error ? e.message : String(e)}`);
+      throw new Error("OpenCode SDK Error: " + (e instanceof Error ? e.message : String(e)));
     } finally {
       this.pendingMessages = [];
     }

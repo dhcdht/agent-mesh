@@ -1,7 +1,6 @@
 import { Task } from "@agent-mesh/shared";
 import { AgentAdapter, AdapterExecutionResult, MessageContext, DeliverResult } from "./types.js";
-import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { createAgentSession } from "@mariozechner/pi-coding-agent";
 
 export class PiAgentAdapter implements AgentAdapter {
   private pendingMessages: MessageContext[] = [];
@@ -14,34 +13,54 @@ export class PiAgentAdapter implements AgentAdapter {
   }
 
   async execute(task: Task): Promise<AdapterExecutionResult> {
-    console.log(`[node] agent:${this.agentId} executing self-host task: ${task.id}`);
+    console.log(`[PiAgentAdapter] Starting REAL SDK session for ${this.agentId}...`);
     
-    const prompt = task.description;
-    const fileMatch = prompt.match(/FILE:\s*([^\s\n]+)/);
-    const contentMatch = prompt.match(/CONTENT:\s*([\s\S]+)$|CONTENT:\s*([\s\S]+)\n\[/);
+    const cwd = this.config.cwd || process.cwd();
 
-    if (fileMatch && (contentMatch?.[1] || contentMatch?.[2])) {
-      const relativePath = fileMatch[1].trim();
-      const content = (contentMatch[1] || contentMatch[2]).trim();
-      
-      const absolutePath = resolve(process.cwd(), relativePath);
-      
-      try {
-        mkdirSync(dirname(absolutePath), { recursive: true });
-        writeFileSync(absolutePath, content);
-        const summary = `SUCCESS: Agent autonomously updated ${relativePath}`;
-        return {
-          summary,
-          output: { stdout: summary, exitCode: 0 }
-        };
-      } catch (e: any) {
-        throw new Error(`Self-host Write Failed: ${e.message}`);
-      }
+    try {
+      const { session } = await createAgentSession({
+        cwd,
+        model: this.config.model || "anthropic/claude-3-5-sonnet-20241022"
+      });
+
+      let isDone = false;
+      const completionPromise = new Promise<void>((resolve) => {
+        session.subscribe((event: any) => {
+          if (event.type === 'message_end' && event.message.role === 'assistant') {
+            const messages = session.state.messages;
+            const lastMsg: any = messages[messages.length - 1];
+            const hasPendingTools = lastMsg?.content?.some((c: any) => c.type === 'toolCall');
+            if (!hasPendingTools) {
+              isDone = true;
+              resolve();
+            }
+          }
+        });
+        setTimeout(() => { if (!isDone) resolve(); }, 300000);
+      });
+
+      const promptText = `TASK: ${task.subject}\nDETAIL: ${task.description}\nRECENT_MESSAGES: ${JSON.stringify(this.pendingMessages)}`;
+
+      await session.prompt(promptText);
+      await completionPromise;
+
+      const finalMessages = session.state.messages;
+      const lastAssistantMsg: any = finalMessages[finalMessages.length - 1];
+      const summary = lastAssistantMsg?.content
+        ?.filter((c: any) => c.type === 'text')
+        ?.map((c: any) => c.text)
+        ?.join('\n') || "Task completed.";
+
+      session.dispose();
+
+      return {
+        summary,
+        output: { stdout: summary, stderr: "", exitCode: 0 }
+      };
+    } catch (e: any) {
+      throw new Error(`Pi SDK Runtime Error: ${e.message}`);
+    } finally {
+      this.pendingMessages = [];
     }
-
-    return {
-      summary: "ACK: No file operation detected, task skipped.",
-      output: { stdout: "no-op", exitCode: 0 }
-    };
   }
 }

@@ -3,14 +3,29 @@ mesh:
   name: Agent Mesh 核心团队
 
 repos:
-  - id: repo-core
-    path: /Users/dhcdht/Desktop/Projects/agent-mesh
+  - id: repo-coordinator
+    path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/coordinator
+    agent:
+      id: agent-coordinator
+      name: Coordinator 专家
+      cliType: pi-agent
+      cliConfig: {}
+
+  - id: repo-node
+    path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/node
     agent:
       id: agent-node
-      name: Node 运行时专家 (SDK)
+      name: Node 运行时专家
       cliType: pi-agent
-      cliConfig:
-        timeoutMs: 600000
+      cliConfig: {}
+
+  - id: repo-shared
+    path: /Users/dhcdht/Desktop/Projects/agent-mesh/packages/shared
+    agent:
+      id: agent-shared
+      name: 架构师 (Shared)
+      cliType: pi-agent
+      cliConfig: {}
 
 coordinator:
   url: http://localhost:3000

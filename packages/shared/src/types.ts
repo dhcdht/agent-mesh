@@ -23,6 +23,16 @@ export interface Task {
   updatedAt: string;
 }
 
+export interface CreateTaskPayload {
+  meshId?: string;
+  subject: string;
+  description: string;
+  owner: string;
+  repoId?: string;
+  parentId?: string;
+}
+
+
 /** 标准消息类型（借鉴 Stream0：request/question/answer/done/failed + broadcast） */
 export type MessageType =
   | "request"   // 任务请求
