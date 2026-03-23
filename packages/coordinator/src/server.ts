@@ -79,6 +79,57 @@ export async function buildServer(dbPath: string): Promise<FastifyInstance> {
       const mcpServer = await createMcpServer(app.storage);
       let mcpTransport: SSEServerTransport | null = null;
 
+      api.get("/mcp/tools", async (request, reply) => {
+        // @ts-ignore - MCP SDK server has internal listTools but we can also use the one we registered
+        return reply.send({ 
+          tools: [
+            {
+              name: "list_tasks",
+              description: "List all tasks in a specific mesh",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  meshId: { type: "string" },
+                  status: { type: "string" },
+                  owner: { type: "string" }
+                }
+              }
+            },
+            {
+              name: "create_task",
+              description: "Create a new task in the mesh",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  id: { type: "string" },
+                  meshId: { type: "string" },
+                  subject: { type: "string" },
+                  description: { type: "string" },
+                  owner: { type: "string" },
+                  repoId: { type: "string" },
+                  parentId: { type: "string" }
+                }
+              }
+            },
+            {
+              name: "send_message",
+              description: "Send a message to an agent or broadcast to all",
+              inputSchema: {
+                type: "object",
+                properties: {
+                  meshId: { type: "string" },
+                  from: { type: "string" },
+                  to: { type: "string" },
+                  type: { type: "string", enum: ["message", "broadcast", "question", "answer"] },
+                  text: { type: "string" },
+                  taskId: { type: "string" }
+                }
+              }
+            }
+          ]
+        });
+      });
+
       api.get("/mcp", async (request, reply) => {
         mcpTransport = new SSEServerTransport("/api/v1/mcp/messages", reply.raw);
         await mcpServer.connect(mcpTransport);
