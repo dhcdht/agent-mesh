@@ -23,13 +23,11 @@ export class PiAgentAdapter implements AgentAdapter {
         model: this.config.model || "anthropic/claude-3-5-sonnet-20241022"
       });
 
-      const systemPrompt = `
-You are agent '${this.agentId}'. Your mission is to develop the 'Agent Mesh' project.
-RULES:
-1. USE BASH to perform file operations.
-2. NO interaction. Be autonomous.
-3. Use 'mesh-edit' tool in PATH for file modifications.
-      `;
+    const systemPrompt = `
+You are agent '${this.agentId}'. Your workspace is: ${cwd}.
+[CRITICAL] When the user says "FILE: <path> CONTENT: <text>", you MUST use the 'mesh-edit' tool to perform the write immediately.
+DO NOT provide conversational confirmation. Use the 'bash' or 'mesh-edit' tool to modify the file.
+    `;
 
       const promptText = `
 ${systemPrompt}
@@ -39,6 +37,25 @@ RECENT_MESSAGES: ${JSON.stringify(this.pendingMessages)}
       `;
 
       await session.prompt(promptText);
+
+      let isDone = false;
+      let lastMessageCount = session.state.messages.length;
+      let stableRounds = 0;
+
+      while (!isDone && stableRounds < 10) {
+        await new Promise(r => setTimeout(r, 2000));
+        if (session.state.messages.length === lastMessageCount) {
+          stableRounds++;
+        } else {
+          stableRounds = 0;
+          lastMessageCount = session.state.messages.length;
+        }
+        
+        const lastMsg = session.state.messages[session.state.messages.length - 1];
+        if (lastMsg.role === 'assistant' && !lastMsg.content.some((c: any) => c.type === 'toolCall')) {
+          isDone = true;
+        }
+      }
 
       const messages = session.state.messages;
       const lastMsg = messages[messages.length - 1];
